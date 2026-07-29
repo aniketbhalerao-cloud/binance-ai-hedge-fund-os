@@ -1,0 +1,60 @@
+[project]
+name = "binance-ai-hedge-fund-os"
+version = "0.1.0"
+description = "Institutional-grade AI hedge fund operating system for Binance."
+readme = "README.md"
+requires-python = "==3.12.*"
+license = { text = "MIT" }
+authors = [{ name = "Binance AI Hedge Fund OS" }]
+dependencies = [
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "python-dotenv>=1.0",
+]
+
+[project.scripts]
+hedge-fund-os = "app.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = [
+    "app",
+    "agents",
+    "core",
+    "config",
+    "database",
+    "execution",
+    "strategies",
+    "risk",
+    "memory",
+    "dashboard",
+    "api",
+    "backtesting",
+    "paper_trading",
+    "monitoring",
+]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

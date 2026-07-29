@@ -1,0 +1,40 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: binance-ai-hedge-fund-os:latest
+    container_name: hedge-fund-os-app
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    container_name: hedge-fund-os-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hedge_fund_os
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: hedge-fund-os-redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+volumes:
+  db_data:
