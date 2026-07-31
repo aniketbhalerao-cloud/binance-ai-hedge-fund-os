@@ -20,17 +20,13 @@ changes existing call sites. The repositories themselves remain logging-free.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
+from core.logging import LoggerFactory
 from database.interfaces import (
     OrderRepository,
     PositionRepository,
     TradeRepository,
 )
 from models import Order, Position, Trade
-
-if TYPE_CHECKING:
-    from core.logging import LoggerFactory
 
 __all__ = ["PersistenceService"]
 
@@ -96,6 +92,8 @@ class PersistenceService:
 
     def save_position(self, position: Position) -> None:
         """Persist (insert or update) a position, keyed by symbol."""
+        if self._log is not None:
+            self._log.debug("save_position", extra={"symbol": position.symbol})
         self._positions.add(position)
 
     def get_position(self, symbol: str) -> Position | None:
