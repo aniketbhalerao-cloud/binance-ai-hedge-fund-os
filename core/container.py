@@ -15,11 +15,13 @@ wired in later via providers at the application's composition root.
 
 from __future__ import annotations
 
+import inspect
 from functools import lru_cache
 from threading import RLock
-from typing import TypeVar, cast
+from typing import Any, TypeVar, cast, get_type_hints
 
 from core.interfaces import Lifetime, Provider, Registry, Resolver
+from core.lifetime import DEFAULT_LIFETIME
 from core.registry import ServiceRegistry
 
 #: The type produced by a provider / resolved from the container.
@@ -133,6 +135,106 @@ class ServiceContainer:
         """
         with self._lock:
             self._singletons.clear()
+
+    # -- constructor injection ----------------------------------------------
+
+    def register_class(
+        self,
+        key: type[T],
+        cls: type[T] | None = None,
+        *,
+        lifetime: Lifetime = DEFAULT_LIFETIME,
+    ) -> None:
+        """Register a class to be built via constructor injection.
+
+        When ``key`` is resolved, the container instantiates the class and
+        supplies each annotated ``__init__`` parameter by resolving it from the
+        container. Parameters that are not registered but declare a default fall
+        back to that default. This lets services declare their dependencies as
+        typed constructor arguments instead of hand-written factories.
+
+        Args:
+            key: The type used to resolve the service.
+            cls: Concrete class to instantiate; defaults to ``key`` itself.
+            lifetime: Singleton (cached) or transient (rebuilt each resolve).
+        """
+        target: type[T] = cls if cls is not None else key
+
+        def _provider(resolver: Resolver) -> T:
+            return self._build(target, resolver)
+
+        self.register(key, _provider, lifetime=lifetime)
+
+    def create(self, cls: type[T]) -> T:
+        """Construct ``cls`` via constructor injection without registering it.
+
+        Dependencies are resolved from this container; ``cls`` itself is neither
+        registered nor cached.
+
+        Args:
+            cls: The class to instantiate.
+
+        Returns:
+            A new instance of ``cls``.
+        """
+        return self._build(cls, cast(Resolver, self))
+
+    def _build(self, cls: type[T], resolver: Resolver) -> T:
+        """Instantiate ``cls``, resolving its annotated constructor parameters.
+
+        Args:
+            cls: The class to build.
+            resolver: The resolver used to obtain each dependency.
+
+        Returns:
+            A new instance of ``cls``.
+
+        Raises:
+            TypeError: If a required parameter lacks a type annotation.
+            KeyError: If a required, annotated dependency is not registered.
+        """
+        try:
+            signature = inspect.signature(cls)
+        except (ValueError, TypeError):
+            # Builtins / objects without an introspectable signature.
+            return cls()
+
+        try:
+            hints = get_type_hints(cls.__init__)
+        except Exception:  # pragma: no cover - unresolved forward refs, etc.
+            hints = {}
+
+        kwargs: dict[str, Any] = {}
+        for name, parameter in signature.parameters.items():
+            if parameter.kind in (
+                inspect.Parameter.VAR_POSITIONAL,
+                inspect.Parameter.VAR_KEYWORD,
+            ):
+                continue
+
+            annotation = hints.get(name, parameter.annotation)
+            has_default = parameter.default is not inspect.Parameter.empty
+
+            if annotation is inspect.Parameter.empty:
+                if has_default:
+                    continue
+                raise TypeError(
+                    f"Cannot inject parameter {name!r} of "
+                    f"{cls.__name__}.__init__: missing type annotation."
+                )
+
+            if isinstance(annotation, type) and self.has(annotation):
+                kwargs[name] = resolver.resolve(annotation)
+            elif has_default:
+                continue
+            else:
+                dependency = getattr(annotation, "__name__", annotation)
+                raise KeyError(
+                    f"Cannot inject parameter {name!r} of {cls.__name__}: "
+                    f"no registration for {dependency!r}."
+                )
+
+        return cls(**kwargs)
 
 
 @lru_cache(maxsize=1)
