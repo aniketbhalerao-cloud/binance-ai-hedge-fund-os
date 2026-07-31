@@ -65,3 +65,14 @@
 - Decimal monetary types
 - Exchange-independent domain layer
 - Strong typing
+Sprint 1
+
+Task 6 completed
+
+Implemented asynchronous Event Bus
+
+Implemented immutable Events
+
+Added publish/subscribe architecture
+
+Added generic infrastructure events
