@@ -110,3 +110,60 @@ Mention:
 
 Documentation only.
 Do not modify source code.
+# Changelog
+
+---
+
+## Sprint 2
+
+### Task 11 – Trading Engine Core
+
+**Status:** ✅ Completed
+
+### Added
+
+- Introduced the `trading/` package as the orchestration layer of the AI Trading Operating System.
+- Implemented the `TradingEngine` as the central lifecycle coordinator.
+- Added the `TradingCoordinator` to orchestrate infrastructure services.
+- Implemented a thread-safe `LifecycleManager` with explicit state transitions.
+- Added immutable `RuntimeState` for engine status, timestamps, counters, and error tracking.
+- Created Trading Engine–specific lifecycle events:
+  - EngineInitializing
+  - EngineStarting
+  - EngineStarted
+  - EnginePaused
+  - EngineResumed
+  - EngineStopping
+  - EngineStopped
+  - EngineFailed
+- Added Trading Engine–specific exception hierarchy.
+- Added interface definitions for future trading components.
+- Integrated the Trading Engine with:
+  - Dependency Injection Container
+  - Event Bus
+  - LoggerFactory
+  - PersistenceService (reference only)
+
+### Testing
+
+- Added unit tests for:
+  - TradingEngine
+  - TradingCoordinator
+  - LifecycleManager
+  - RuntimeState
+  - Dependency Injection registration
+- Added integration tests for:
+  - Trading Engine lifecycle
+  - Event Bus integration
+  - Logger integration
+  - PersistenceService integration
+- Full test suite increased from **35** to **54** passing tests.
+
+### Notes
+
+- The Trading Engine currently provides orchestration only.
+- No business logic was introduced.
+- No strategy, market data, exchange connectivity, risk calculations, or order execution was implemented.
+- The architecture remains fully event-driven and dependency-injected.
+
+---
