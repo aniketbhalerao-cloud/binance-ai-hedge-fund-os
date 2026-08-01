@@ -166,4 +166,33 @@ Do not modify source code.
 - No strategy, market data, exchange connectivity, risk calculations, or order execution was implemented.
 - The architecture remains fully event-driven and dependency-injected.
 
----
+---## Sprint 2
+
+### Task 12 – Market Data Framework
+
+**Status:** ✅ Completed
+
+### Added
+
+- Exchange-agnostic Market Data Pipeline
+- Provider abstraction
+- Data normalizer
+- Thread-safe in-memory cache
+- Market data event model
+- Dependency Injection integration
+- Event Bus integration
+- Trading Engine integration
+- Replay-compatible architecture
+
+### Testing
+
+- Added Market Data unit tests
+- Added Market Data integration tests
+- Total test suite increased from 54 to 70 passing tests
+
+### Notes
+
+- No exchange-specific implementation
+- No WebSocket implementation
+- No REST API implementation
+- Replay-ready architecture
