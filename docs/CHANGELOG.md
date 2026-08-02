@@ -388,3 +388,75 @@ This framework intentionally does not implement:
 - JWT
 
 The framework provides reusable abstractions that future broker adapters will implement.
+# Sprint 3 – Task 18 – Binance Spot Adapter
+
+## Added
+
+### Binance Spot Adapter
+
+Implemented the first concrete Exchange Adapter.
+
+### Components
+
+- Binance Spot Adapter
+- Binance Authentication
+- Binance Signer
+- Binance REST Client
+- Binance WebSocket Client
+- Binance Connection Manager
+- Binance Request Translator
+- Binance Response Parser
+- Binance Request Validator
+- Binance Configuration
+- Binance Models
+- Binance Events
+- Binance Exceptions
+
+### Features
+
+- API Key Authentication
+- HMAC SHA256 Request Signing
+- REST Client
+- WebSocket Client
+- Connection Management
+- Retry Support
+- Timeout Support
+- Error Translation
+- Request Translation
+- Response Parsing
+- Thread-safe Connection Management
+- Structured Logging
+- Event Bus Integration
+
+### Architecture
+
+- Exchange Adapter Framework reused unchanged.
+- Broker-specific implementation isolated.
+- Dependency Injection reused.
+- Transport abstraction enables deterministic testing.
+- REST and WebSocket clients separated.
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake HTTP Transport
+- Fake WebSocket Transport
+
+Current test suite:
+
+**179 Passing Tests**
+
+### Notes
+
+The adapter implements Binance Spot only.
+
+Future releases will add:
+
+- Binance Futures
+- Margin Trading
+- User Data Streams
+- OCO Orders
+- Advanced Order Types
