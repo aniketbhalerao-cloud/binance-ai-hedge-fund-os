@@ -251,3 +251,35 @@ Do not modify source code.
 - No order execution implemented.
 - No portfolio management implemented.
 - Framework prepared for future Maximum Position Size, Daily Loss, Exposure, Drawdown, Leverage, Margin, Portfolio Correlation, and AI Risk Rules.
+## Sprint 2 – Task 15 – Order Management Framework
+
+### Added
+
+- Order Management Framework
+- Order Engine
+- Order Manager
+- Order Factory
+- Order Validator
+- Order Router
+- Immutable Order Models
+- Order Events
+- Dependency Injection integration
+- Unit tests
+- Integration tests
+
+### Architecture
+
+- Introduced exchange-independent order preparation.
+- Added standardized order lifecycle.
+- Prepared framework for future execution engines and broker adapters.
+
+### Testing
+
+- Added 17 new Order Framework tests.
+- Total test suite increased to **118 passing tests**.
+
+### Notes
+
+- No exchange connectivity implemented.
+- No live execution implemented.
+- Framework prepared for future Execution Layer and broker integrations.
