@@ -539,3 +539,83 @@ The framework intentionally does not implement:
 - Multi-currency portfolios
 
 These capabilities will be added in future releases.
+# Sprint 3 – Task 20 – Position Management Framework
+
+## Added
+
+### Position Management Framework
+
+Implemented an exchange-independent Position Management Framework responsible for tracking the lifecycle of trading positions after portfolio updates.
+
+### Components
+
+- Position Engine
+- Position Manager
+- Position Tracker
+- Position Lifecycle
+- Position Calculator
+- Position History
+- Position Metrics
+- Position Registry
+- Position Models
+- Position Events
+- Position Exceptions
+
+### Features
+
+- Position tracking
+- Position lifecycle management
+- Average entry price
+- Average exit price
+- Realized P&L
+- Unrealized P&L
+- Position duration
+- Position history
+- Position metrics
+- Position snapshots
+- Thread-safe updates
+- Event Bus integration
+- Dependency Injection
+
+### Architecture
+
+- Exchange-independent design
+- Consumes standardized PortfolioResult
+- Stateless calculator, history, and metrics services
+- Atomic position updates
+- Immutable position models
+- Structured logging with LoggerFactory
+
+### Documentation
+
+Added:
+
+- ADR-013 – Position Management Framework
+- Task 20 Prompt
+- Task 20 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Position components
+
+Current test suite:
+
+**215 Passing Tests**
+
+### Notes
+
+The framework intentionally does not implement:
+
+- Multi-leg positions
+- Options positions
+- Futures positions
+- Hedged positions
+- Tax lot accounting
+- Position replay
+- Advanced analytics
+
+These capabilities will be added in future releases.
