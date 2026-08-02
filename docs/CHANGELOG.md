@@ -214,3 +214,40 @@ Do not modify source code.
 ### Notes
 - No concrete trading strategies implemented.
 - Framework prepared for future RSI, EMA, MACD, AI, and custom strategies.
+## Sprint 2 – Task 14 – Risk Framework
+
+### Added
+
+- Risk Framework
+- Risk Engine
+- Risk Manager
+- Risk Validator
+- Risk Context
+- Risk Decision models
+- Risk Rule abstraction
+- Risk Events
+- Dependency Injection integration
+- Event Bus integration
+- Structured logging
+- Unit tests
+- Integration tests
+
+### Architecture
+
+- Introduced a dedicated Risk Framework between the Strategy Framework and future Order Manager.
+- Established reusable, exchange-independent risk evaluation.
+- Implemented immutable RiskContext and RiskDecision models.
+- Adopted a plug-in architecture for future risk rules.
+- Continued constructor-based Dependency Injection and Event-Driven Architecture.
+
+### Testing
+
+- Added 16 new Risk Framework tests.
+- Total test suite increased to **101 passing tests**.
+
+### Notes
+
+- No concrete risk rules implemented.
+- No order execution implemented.
+- No portfolio management implemented.
+- Framework prepared for future Maximum Position Size, Daily Loss, Exposure, Drawdown, Leverage, Margin, Portfolio Correlation, and AI Risk Rules.
