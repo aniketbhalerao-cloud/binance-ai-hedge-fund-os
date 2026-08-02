@@ -1,65 +1,233 @@
-# Binance AI Hedge Fund OS
+# 🚀 AI Trading Operating System
 
-An institutional-grade, modular operating system for an AI-driven trading fund on
-Binance. This repository currently contains **Task 1 — project scaffolding only**.
-No trading logic is implemented yet.
+![Python](https://img.shields.io/badge/Python-3.14-blue)
+![Tests](https://img.shields.io/badge/Tests-215%20Passing-success)
+![Architecture](https://img.shields.io/badge/Architecture-Clean-blueviolet)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-> ⚠️ **Status:** Scaffolding. All modules are intentionally empty placeholders.
+---
 
-## Requirements
+# Overview
 
-- Python **3.12**
-- [uv](https://github.com/astral-sh/uv) for dependency management
-- Docker + Docker Compose (optional, for containerized runs)
+AI Trading Operating System is a modular, event-driven algorithmic trading platform built using Clean Architecture, Domain-Driven Design (DDD), and Dependency Injection.
 
-## Getting Started
+The platform separates every trading responsibility into independent frameworks that communicate through standardized domain models and an Event Bus.
+
+The architecture is designed to support:
+
+- Cryptocurrency Trading
+- Equity Trading
+- Multi-Broker Integration
+- AI Trading Agents
+- Paper Trading
+- Backtesting
+- Live Trading
+- Portfolio Analytics
+
+without changing existing frameworks.
+
+---
+
+# Architecture
+
+```
+                    Market Data Framework
+                            │
+                            ▼
+                     Trading Engine
+                            │
+                            ▼
+                  Strategy Framework
+                            │
+                            ▼
+                    Risk Framework
+                            │
+                            ▼
+              Order Management Framework
+                            │
+                            ▼
+                 Execution Framework
+                            │
+                            ▼
+            Exchange Adapter Framework
+                            │
+                            ▼
+                 Binance Spot Adapter
+                            │
+                            ▼
+             Portfolio Management Framework
+                            │
+                            ▼
+             Position Management Framework
+                            │
+                            ▼
+              Trade Lifecycle Framework
+```
+
+---
+
+# Project Structure
+
+```
+core/
+market_data/
+strategies/
+risk/
+order_management/
+execution/
+exchange_adapters/
+adapters/
+portfolio/
+positions/
+trades/
+tests/
+docs/
+```
+
+---
+
+# Frameworks Completed
+
+| Version | Framework | Status |
+|----------|-----------|--------|
+| v1.0 | Core Infrastructure | ✅ |
+| v2.3 | Strategy Framework | ✅ |
+| v2.4 | Risk Framework | ✅ |
+| v2.5 | Order Management | ✅ |
+| v3.0 | Execution Framework | ✅ |
+| v3.1 | Exchange Adapter Framework | ✅ |
+| v3.2 | Binance Spot Adapter | ✅ |
+| v3.3 | Portfolio Management | ✅ |
+| v3.4 | Position Management | ✅ |
+| v3.5 | Trade Lifecycle Framework | ✅ |
+
+---
+
+# Features
+
+- Event-Driven Architecture
+- Dependency Injection
+- Thread-Safe Components
+- Exchange Independence
+- Immutable Domain Models
+- Structured Logging
+- Clean Architecture
+- Domain Driven Design
+- Modular Frameworks
+- Extensive Automated Testing
+
+---
+
+# Technology Stack
+
+- Python 3.14
+- Pytest
+- Dependency Injection
+- Event Bus
+- HMAC SHA256
+- Binance Spot API
+- Clean Architecture
+- SOLID Principles
+
+---
+
+# Running the Project
+
+Clone the repository:
 
 ```bash
-# Install dependencies (creates .venv and resolves the lockfile)
-uv sync
+git clone https://github.com/aniketbhalerao-cloud/binance-ai-hedge-fund-os.git
 
-# Copy the environment template and fill in your values
-cp .env.example .env
-
-# Run the application entrypoint
-uv run python -m app.main
+cd binance-ai-hedge-fund-os
 ```
 
-Or use the Makefile shortcuts:
+Install dependencies:
 
 ```bash
-make install   # uv sync
-make run       # run the app entrypoint
-make lint      # run ruff
-make format    # format with ruff
-make test      # run the test suite
-make docker-up # start the stack with docker compose
+pip install -r requirements.txt
 ```
 
-## Project Structure
+Run tests:
 
-```
-binance-ai-hedge-fund-os/
-├── app/            # Application entrypoint and wiring
-├── agents/         # AI agents (research, execution, risk, etc.)
-├── core/           # Cross-cutting primitives: constants, logging, exceptions
-├── config/         # Settings and configuration loading
-├── database/       # Persistence layer and models
-├── execution/      # Order routing and execution
-├── strategies/     # Trading strategies
-├── risk/           # Risk management and limits
-├── memory/         # Long/short-term memory for agents
-├── dashboard/      # Web dashboard / UI
-├── api/            # Public/internal API layer
-├── backtesting/    # Backtesting engine
-├── paper_trading/  # Paper trading environment
-├── monitoring/     # Metrics, alerting, observability
-├── tests/          # Test suite
-├── docs/           # Documentation
-├── scripts/        # Operational and dev scripts
-└── docker/         # Dockerfiles and container assets
+```bash
+pytest
 ```
 
-## License
+Expected output:
 
-Distributed under the terms of the [MIT License](LICENSE).
+```
+215 passed
+```
+
+---
+
+# Documentation
+
+Architecture Decision Records (ADR):
+
+```
+docs/architecture/decisions/
+```
+
+Task Reviews:
+
+```
+docs/reviews/
+```
+
+Development Prompts:
+
+```
+docs/prompts/
+```
+
+---
+
+# Project Statistics
+
+Current Version:
+
+**v3.5 – Trade Lifecycle Framework**
+
+Frameworks:
+
+- 10 Major Frameworks
+
+Automated Tests:
+
+- **215 Passing Tests**
+
+Architecture:
+
+- Event Driven
+- Clean Architecture
+- Domain Driven Design
+- Dependency Injection
+
+---
+
+# Roadmap
+
+Upcoming milestones:
+
+- Performance Analytics Framework
+- Backtesting Framework
+- Paper Trading Framework
+- AI Decision Engine
+- Live Trading Orchestrator
+
+---
+
+# License
+
+MIT License
+
+---
+
+# Author
+
+**Aniket Bhalerao**
+
+GitHub:
+
+https://github.com/aniketbhalerao-cloudgit status
