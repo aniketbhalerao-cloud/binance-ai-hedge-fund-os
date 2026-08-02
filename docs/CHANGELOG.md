@@ -283,3 +283,108 @@ Do not modify source code.
 - No exchange connectivity implemented.
 - No live execution implemented.
 - Framework prepared for future Execution Layer and broker integrations.
+## Sprint 3 – Task 16 – Execution Framework
+
+### Added
+
+- Execution Framework
+- Execution Engine
+- Execution Manager
+- Execution Executor
+- Execution Validator
+- Execution Router
+- Execution Lifecycle
+- Execution Events
+- Dependency Injection integration
+- Unit tests
+- Integration tests
+
+### Architecture
+
+- Introduced broker-independent execution coordination.
+- Added standardized execution lifecycle.
+- Prepared framework for future Exchange Adapters.
+
+### Testing
+
+- Added 17 new Execution Framework tests.
+- Total test suite increased to **135 passing tests**.
+
+### Notes
+
+- No broker connectivity implemented.
+- No REST APIs implemented.
+- No WebSockets implemented.
+- Framework prepared for future Exchange Adapters.
+# Sprint 3 – Task 17 – Exchange Adapter Framework
+
+## Added
+
+### Exchange Adapter Framework
+
+Implemented a broker-independent Exchange Adapter Framework responsible for providing the abstraction layer between the Execution Framework and future broker implementations.
+
+### Framework Components
+
+- Exchange Engine
+- Exchange Manager
+- Base Exchange Adapter
+- Exchange Authentication
+- Exchange Connection
+- Exchange Validator
+- Exchange Router
+- Exchange Registry
+- Exchange Context
+- Exchange Models
+- Exchange Events
+- Exchange Exceptions
+
+### Architecture
+
+- Added broker-independent exchange abstraction layer.
+- Introduced standardized exchange request and response models.
+- Added adapter lifecycle management.
+- Added authentication abstraction.
+- Added connection abstraction.
+- Added adapter registry.
+- Added routing framework.
+- Added validation framework.
+- Reused existing Dependency Injection container.
+- Integrated with the existing Event Bus.
+- Reused LoggerFactory for structured logging.
+
+### Documentation
+
+Added:
+
+- ADR-010 – Exchange Adapter Framework
+- Task 17 Prompt
+- Task 17 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Exchange Adapter support
+
+Current test suite:
+
+**155 Passing Tests**
+
+### Notes
+
+This framework intentionally does not implement:
+
+- Binance Adapter
+- Zerodha Adapter
+- Interactive Brokers Adapter
+- REST APIs
+- WebSockets
+- Broker SDKs
+- API Key Handling
+- OAuth
+- JWT
+
+The framework provides reusable abstractions that future broker adapters will implement.
