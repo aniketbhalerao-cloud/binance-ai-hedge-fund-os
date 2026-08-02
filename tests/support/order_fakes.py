@@ -10,6 +10,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from models import OrderSide, OrderType
 from order_management.context import OrderContext
 from order_management.models import (
     OrderIdentifier,
@@ -17,7 +18,6 @@ from order_management.models import (
     OrderRoute,
     OrderValidationResult,
 )
-from models import OrderSide, OrderType
 from risk.models import RiskDecision, RiskDecisionType
 from strategies.signals import SignalDirection, TradingSignal
 
@@ -34,7 +34,9 @@ _FIXED = datetime(2026, 1, 1, tzinfo=UTC)
 class FakeOrderFactory:
     """Returns a fixed order request (optionally raising)."""
 
-    def __init__(self, request: OrderRequest | None = None, *, error: Exception | None = None) -> None:
+    def __init__(
+        self, request: OrderRequest | None = None, *, error: Exception | None = None
+    ) -> None:
         self._request = request
         self._error = error
 
@@ -70,7 +72,9 @@ class FakeOrderValidator:
 class FakeOrderRouter:
     """Returns a fixed route (optionally raising)."""
 
-    def __init__(self, destination: str = "fake", *, error: Exception | None = None) -> None:
+    def __init__(
+        self, destination: str = "fake", *, error: Exception | None = None
+    ) -> None:
         self._destination = destination
         self._error = error
 

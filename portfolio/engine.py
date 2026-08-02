@@ -17,8 +17,8 @@ from portfolio.interfaces import PortfolioManager
 from portfolio.models import PortfolioResult
 
 if TYPE_CHECKING:
-    from execution.interfaces import ExecutionEngine
     from exchange_adapters.interfaces import ExchangeEngine
+    from execution.interfaces import ExecutionEngine
     from trading.engine import TradingEngine
 
 __all__ = ["DefaultPortfolioEngine"]

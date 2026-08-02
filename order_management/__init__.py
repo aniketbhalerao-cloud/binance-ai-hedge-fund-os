@@ -138,7 +138,9 @@ def register_order_management(container: Container) -> None:
     container.register_class(OrderRouter, DefaultOrderRouter)
 
     def _build_manager(resolver: Resolver) -> DefaultOrderManager:
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return DefaultOrderManager(
             resolver.resolve(EventBus),
             resolver.resolve(OrderFactory),
@@ -155,14 +157,14 @@ def register_order_management(container: Container) -> None:
         from strategies.interfaces import StrategyManager
         from trading.engine import TradingEngine
 
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         trading_engine = (
             resolver.resolve(TradingEngine) if resolver.has(TradingEngine) else None
         )
         strategy_manager = (
-            resolver.resolve(StrategyManager)
-            if resolver.has(StrategyManager)
-            else None
+            resolver.resolve(StrategyManager) if resolver.has(StrategyManager) else None
         )
         risk_engine = resolver.resolve(RiskEngine) if resolver.has(RiskEngine) else None
         return DefaultOrderEngine(

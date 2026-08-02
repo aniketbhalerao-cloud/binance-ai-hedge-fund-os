@@ -15,9 +15,8 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any
 
-from order_management.models import OrderRequest, OrderRoute
-
 from execution.state import ExecutionState
+from order_management.models import OrderRequest, OrderRoute
 
 __all__ = [
     "ExecutionStatus",

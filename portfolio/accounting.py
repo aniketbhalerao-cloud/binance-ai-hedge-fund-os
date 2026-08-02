@@ -17,7 +17,6 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from models import OrderSide
-
 from portfolio.context import PortfolioContext
 from portfolio.exceptions import AccountingError, HoldingsError
 from portfolio.models import LedgerEntry, PortfolioPosition
@@ -85,12 +84,8 @@ class DefaultHoldingsManager:
             if position is None:
                 return PortfolioPosition(symbol, quantity, price)
             new_qty = position.quantity + quantity
-            new_cost = (
-                position.cost_basis + quantity * price
-            ) / new_qty
-            return PortfolioPosition(
-                symbol, new_qty, new_cost, position.realized_pnl
-            )
+            new_cost = (position.cost_basis + quantity * price) / new_qty
+            return PortfolioPosition(symbol, new_qty, new_cost, position.realized_pnl)
 
         # SELL
         if position is None or quantity > position.quantity:

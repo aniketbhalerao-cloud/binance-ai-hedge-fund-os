@@ -13,7 +13,6 @@ from datetime import datetime
 from decimal import Decimal
 
 from models import OrderSide
-
 from positions.exceptions import PositionCalculationError
 from positions.models import PositionCalculation, PositionSide, PositionTrade
 
@@ -40,7 +39,9 @@ class DefaultPositionCalculator:
             raise PositionCalculationError("no trades to calculate")
 
         opening_side = trades[0].side
-        side = PositionSide.LONG if opening_side is OrderSide.BUY else PositionSide.SHORT
+        side = (
+            PositionSide.LONG if opening_side is OrderSide.BUY else PositionSide.SHORT
+        )
 
         entry_qty = _ZERO
         entry_notional = _ZERO

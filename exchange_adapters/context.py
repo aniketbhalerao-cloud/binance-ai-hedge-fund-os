@@ -14,9 +14,8 @@ from datetime import UTC, datetime
 from types import MappingProxyType
 from typing import Any
 
-from execution.models import ExecutionResult
-
 from exchange_adapters.state import AuthenticationState, ConnectionState
+from execution.models import ExecutionResult
 
 __all__ = ["ExchangeContext"]
 

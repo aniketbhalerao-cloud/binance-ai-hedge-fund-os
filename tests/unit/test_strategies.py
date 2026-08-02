@@ -38,8 +38,11 @@ class SignalTests(unittest.TestCase):
     def test_confidence_bounds_enforced(self) -> None:
         with self.assertRaises(ValueError):
             TradingSignal(
-                id="s", strategy_name="x", symbol="Y",
-                direction=SignalDirection.BUY, confidence=1.5,
+                id="s",
+                strategy_name="x",
+                symbol="Y",
+                direction=SignalDirection.BUY,
+                confidence=1.5,
             )
 
     def test_signal_is_immutable(self) -> None:
@@ -99,7 +102,9 @@ class EventAndExceptionTests(unittest.TestCase):
 
 
 class ManagerTests(unittest.IsolatedAsyncioTestCase):
-    def _manager(self) -> tuple[StrategyExecutionManager, EventBus, InMemoryStrategyRegistry]:
+    def _manager(
+        self,
+    ) -> tuple[StrategyExecutionManager, EventBus, InMemoryStrategyRegistry]:
         bus = EventBus()
         registry = InMemoryStrategyRegistry()
         factory = DefaultStrategyFactory(ServiceContainer())

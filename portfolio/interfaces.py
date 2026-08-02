@@ -12,7 +12,6 @@ from decimal import Decimal
 from typing import Protocol, runtime_checkable
 
 from models import OrderSide
-
 from portfolio.context import PortfolioContext
 from portfolio.models import (
     LedgerEntry,

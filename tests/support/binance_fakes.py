@@ -38,7 +38,9 @@ ORDER_PAYLOAD: dict[str, Any] = {
 class FakeHttpTransport:
     """Records requests and returns a canned :class:`HttpResponse`."""
 
-    def __init__(self, status: int = 200, payload: Any = None, *, error: Exception | None = None) -> None:
+    def __init__(
+        self, status: int = 200, payload: Any = None, *, error: Exception | None = None
+    ) -> None:
         self._status = status
         self._payload = payload if payload is not None else ORDER_PAYLOAD
         self._error = error

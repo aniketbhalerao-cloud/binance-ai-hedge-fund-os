@@ -134,7 +134,9 @@ def register_execution(container: Container) -> None:
     container.register_class(ExecutionRouter, DefaultExecutionRouter)
 
     def _build_manager(resolver: Resolver) -> DefaultExecutionManager:
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return DefaultExecutionManager(
             resolver.resolve(EventBus),
             resolver.resolve(ExecutionExecutor),
@@ -154,7 +156,9 @@ def register_execution(container: Container) -> None:
         from strategies.interfaces import StrategyManager
         from trading.engine import TradingEngine
 
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return DefaultExecutionEngine(
             resolver.resolve(ExecutionManager),
             resolver.resolve(EventBus),
@@ -167,7 +171,9 @@ def register_execution(container: Container) -> None:
                 if resolver.has(StrategyManager)
                 else None
             ),
-            risk_engine=resolver.resolve(RiskEngine) if resolver.has(RiskEngine) else None,
+            risk_engine=(
+                resolver.resolve(RiskEngine) if resolver.has(RiskEngine) else None
+            ),
             order_engine=(
                 resolver.resolve(OrderEngine) if resolver.has(OrderEngine) else None
             ),

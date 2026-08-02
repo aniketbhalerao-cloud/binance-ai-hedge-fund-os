@@ -17,10 +17,10 @@ from order_management import (
 )
 from risk import register_risk
 from strategies import register_strategies
-from trading import register_trading_engine
 from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 from tests.support.market_data_fakes import FakeMarketDataProvider
 from tests.support.order_fakes import make_order_context
+from trading import register_trading_engine
 
 
 class OrderIntegrationTests(unittest.IsolatedAsyncioTestCase):

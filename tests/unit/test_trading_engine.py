@@ -5,8 +5,8 @@ from __future__ import annotations
 import unittest
 
 from core.container import ServiceContainer
-from core.logging import LoggerFactory
 from events.bus import EventBus
+from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 from trading import (
     EngineAlreadyRunningError,
     EngineInitializationError,
@@ -21,7 +21,6 @@ from trading import (
 )
 from trading.exceptions import ServiceRegistrationError
 from trading.lifecycle import EngineFailed, EngineStarted
-from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 
 
 class _RaisingCoordinator:

@@ -116,7 +116,9 @@ class MarketDataPipelineService:
 
     async def _on_raw(self, raw: RawPayload) -> None:
         """Process one raw payload through the full pipeline, isolating errors."""
-        exchange = raw.get("exchange", "unknown") if isinstance(raw, dict) else "unknown"
+        exchange = (
+            raw.get("exchange", "unknown") if isinstance(raw, dict) else "unknown"
+        )
         symbol = raw.get("symbol", "unknown") if isinstance(raw, dict) else "unknown"
         await self._bus.publish(MarketDataReceived(exchange=exchange, symbol=symbol))
 
@@ -180,8 +182,10 @@ class MarketDataPipelineService:
         if isinstance(model, OHLCV):
             if not existed:
                 return CandleOpened(candle=model)
-            return CandleClosed(candle=model) if model.is_closed else CandleUpdated(
-                candle=model
+            return (
+                CandleClosed(candle=model)
+                if model.is_closed
+                else CandleUpdated(candle=model)
             )
         raise MarketDataError(f"Unknown normalized model: {type(model).__name__}.")
 

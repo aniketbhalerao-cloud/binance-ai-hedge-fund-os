@@ -122,7 +122,9 @@ def register_risk(container: Container) -> None:
     container.register_class(RiskPolicy, DefaultRiskPolicy)
 
     def _build_manager(resolver: Resolver) -> RiskEvaluationManager:
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return RiskEvaluationManager(
             resolver.resolve(EventBus),
             resolver.resolve(RiskValidator),
@@ -131,20 +133,22 @@ def register_risk(container: Container) -> None:
         )
 
     container.register_singleton(RiskEvaluationManager, _build_manager)
-    container.register_singleton(RiskManager, lambda r: r.resolve(RiskEvaluationManager))
+    container.register_singleton(
+        RiskManager, lambda r: r.resolve(RiskEvaluationManager)
+    )
 
     def _build_engine(resolver: Resolver) -> RiskEvaluationEngine:
         from strategies.interfaces import StrategyManager
         from trading.engine import TradingEngine
 
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         trading_engine = (
             resolver.resolve(TradingEngine) if resolver.has(TradingEngine) else None
         )
         strategy_manager = (
-            resolver.resolve(StrategyManager)
-            if resolver.has(StrategyManager)
-            else None
+            resolver.resolve(StrategyManager) if resolver.has(StrategyManager) else None
         )
         return RiskEvaluationEngine(
             resolver.resolve(RiskManager),

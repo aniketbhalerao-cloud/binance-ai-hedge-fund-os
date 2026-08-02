@@ -12,7 +12,6 @@ from __future__ import annotations
 from decimal import Decimal
 
 from models import OrderSide, OrderType, TimeInForce
-
 from order_management.context import OrderContext
 from order_management.exceptions import OrderFactoryError
 from order_management.models import (
@@ -46,7 +45,9 @@ class DefaultOrderFactory:
                 direction does not correspond to an order (e.g. ``HOLD``).
         """
         if not context.risk_decision.approved:
-            raise OrderFactoryError("Cannot create an order from an unapproved decision.")
+            raise OrderFactoryError(
+                "Cannot create an order from an unapproved decision."
+            )
 
         direction = context.signal.direction
         side = _SIDE_BY_DIRECTION.get(direction)

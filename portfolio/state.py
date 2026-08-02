@@ -28,9 +28,7 @@ VALID_TRANSITIONS: dict[PortfolioState, frozenset[PortfolioState]] = {
     PortfolioState.ACTIVE: frozenset(
         {PortfolioState.ACTIVE, PortfolioState.SUSPENDED, PortfolioState.CLOSED}
     ),
-    PortfolioState.SUSPENDED: frozenset(
-        {PortfolioState.ACTIVE, PortfolioState.CLOSED}
-    ),
+    PortfolioState.SUSPENDED: frozenset({PortfolioState.ACTIVE, PortfolioState.CLOSED}),
     PortfolioState.CLOSED: frozenset(),
 }
 

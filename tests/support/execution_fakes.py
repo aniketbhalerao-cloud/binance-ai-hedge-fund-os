@@ -63,7 +63,9 @@ class FakeExecutionValidator:
 class FakeExecutionRouter:
     """Returns a fixed route, or raises if configured with an error."""
 
-    def __init__(self, destination: str = "fake", *, error: Exception | None = None) -> None:
+    def __init__(
+        self, destination: str = "fake", *, error: Exception | None = None
+    ) -> None:
         self._destination = destination
         self._error = error
 
@@ -86,17 +88,11 @@ def make_execution_context(
         side=OrderSide.BUY,
         order_type=OrderType.MARKET,
         quantity=Decimal("1"),
-        state=(
-            OrderState.READY_FOR_EXECUTION if ready else OrderState.REJECTED
-        ),
+        state=(OrderState.READY_FOR_EXECUTION if ready else OrderState.REJECTED),
     )
     order_result = OrderResult(
-        state=(
-            OrderState.READY_FOR_EXECUTION if ready else OrderState.REJECTED
-        ),
+        state=(OrderState.READY_FOR_EXECUTION if ready else OrderState.REJECTED),
         request=order_request if ready else None,
         route=OrderRoute(destination="default") if ready else None,
     )
-    return ExecutionContext(
-        order_result=order_result, exchange=exchange, symbol=symbol
-    )
+    return ExecutionContext(order_result=order_result, exchange=exchange, symbol=symbol)

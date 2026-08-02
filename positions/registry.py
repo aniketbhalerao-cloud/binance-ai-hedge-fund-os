@@ -49,9 +49,7 @@ class InMemoryPositionRegistry:
     def history(self, position_id: str) -> PositionHistory:
         """Return the history for ``position_id`` (empty if none yet)."""
         with self._lock:
-            return self._histories.get(
-                position_id, PositionHistory(position_id)
-            )
+            return self._histories.get(position_id, PositionHistory(position_id))
 
     def list(self) -> list[Position]:
         """Return all registered positions."""

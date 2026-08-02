@@ -37,12 +37,12 @@ if TYPE_CHECKING:
 __all__ = ["register_binance_adapter"]
 
 
-def _logger(resolver: "Resolver") -> LoggerFactory | None:
+def _logger(resolver: Resolver) -> LoggerFactory | None:
     return resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
 
 
 def register_binance_adapter(
-    container: "Container",
+    container: Container,
     config: BinanceConfig,
     *,
     transport: HttpTransport | None = None,

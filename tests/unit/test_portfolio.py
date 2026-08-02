@@ -162,7 +162,8 @@ class ManagerTests(unittest.IsolatedAsyncioTestCase):
 
         sell = await manager.update(
             make_portfolio_context(
-                side=OrderSide.SELL, price=Decimal("110"),
+                side=OrderSide.SELL,
+                price=Decimal("110"),
                 prices={"BTCUSDT": Decimal("110")},
             )
         )
@@ -185,7 +186,9 @@ class DependencyInjectionTests(unittest.TestCase):
         register_portfolio(container)
         engine = container.resolve(DefaultPortfolioEngine)
         self.assertIs(container.resolve(DefaultPortfolioEngine), engine)
-        self.assertIsInstance(container.resolve(PortfolioManager), DefaultPortfolioManager)
+        self.assertIsInstance(
+            container.resolve(PortfolioManager), DefaultPortfolioManager
+        )
 
 
 if __name__ == "__main__":

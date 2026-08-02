@@ -49,9 +49,7 @@ if TYPE_CHECKING:
 __all__ = ["TradingEngine", "register_trading_engine"]
 
 #: States from which the engine may be (re)started.
-_STARTABLE = frozenset(
-    {EngineState.CREATED, EngineState.STOPPED, EngineState.FAILED}
-)
+_STARTABLE = frozenset({EngineState.CREATED, EngineState.STOPPED, EngineState.FAILED})
 
 
 class TradingEngine:
@@ -246,7 +244,9 @@ def register_trading_engine(container: Container) -> None:
     def _build_coordinator(resolver: Resolver) -> TradingCoordinator:
         from adapters.interfaces import ExchangeInterface
 
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         persistence = (
             resolver.resolve(PersistenceService)
             if resolver.has(PersistenceService)
@@ -268,7 +268,9 @@ def register_trading_engine(container: Container) -> None:
     container.register_singleton(Coordinator, lambda r: r.resolve(TradingCoordinator))
 
     def _build_engine(resolver: Resolver) -> TradingEngine:
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return TradingEngine(
             resolver.resolve(Coordinator),
             resolver.resolve(LifecycleManager),

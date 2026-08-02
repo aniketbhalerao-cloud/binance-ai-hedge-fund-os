@@ -81,10 +81,10 @@ class DefaultPositionManager:
         except PositionError as exc:
             pid = _safe_symbol(context)
             self._error(pid, str(exc))
-            await self._bus.publish(PositionErrorOccurred(position_id=pid, message=str(exc)))
-            existing = (
-                self._registry.get(pid) if self._registry.exists(pid) else None
+            await self._bus.publish(
+                PositionErrorOccurred(position_id=pid, message=str(exc))
             )
+            existing = self._registry.get(pid) if self._registry.exists(pid) else None
             return PositionResult(
                 status=PositionResultStatus.FAILED,
                 position=existing,
@@ -116,7 +116,9 @@ class DefaultPositionManager:
             self._lifecycle.validate(source, target)
 
             opened_at = existing.opened_at if existing and existing.opened_at else now
-            position = self._tracker.build(pid, trade.symbol, calc, target, opened_at, now)
+            position = self._tracker.build(
+                pid, trade.symbol, calc, target, opened_at, now
+            )
             metrics = self._metrics.compute(history, calc)
             snapshot = PositionSnapshot(
                 position=position,
@@ -172,7 +174,9 @@ class DefaultPositionManager:
 
     def _error(self, pid: str, message: str) -> None:
         if self._log is not None:
-            self._log.error("Position error", extra={"position_id": pid, "error": message})
+            self._log.error(
+                "Position error", extra={"position_id": pid, "error": message}
+            )
 
 
 def _safe_symbol(context: PositionContext) -> str:

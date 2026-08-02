@@ -137,4 +137,6 @@ class DefaultOrderManager:
 
     def _error(self, order_id: str | None, message: str) -> None:
         if self._log is not None:
-            self._log.error("Order error", extra={"order_id": order_id, "error": message})
+            self._log.error(
+                "Order error", extra={"order_id": order_id, "error": message}
+            )

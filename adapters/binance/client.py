@@ -79,7 +79,9 @@ class UrllibHttpTransport:
         timeout: float = 10.0,
     ) -> HttpResponse:
         def _send() -> HttpResponse:
-            req = urllib_request.Request(url, method=method, headers=dict(headers or {}))
+            req = urllib_request.Request(
+                url, method=method, headers=dict(headers or {})
+            )
             try:
                 with urllib_request.urlopen(req, timeout=timeout) as resp:
                     body = resp.read().decode("utf-8")

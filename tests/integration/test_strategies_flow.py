@@ -13,10 +13,10 @@ from strategies import (
     StrategyExecutionManager,
     register_strategies,
 )
-from trading import register_trading_engine
 from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 from tests.support.market_data_fakes import FakeMarketDataProvider
 from tests.support.strategy_fakes import BuyStrategy, FakeStrategy, make_context
+from trading import register_trading_engine
 
 
 class StrategyIntegrationTests(unittest.IsolatedAsyncioTestCase):

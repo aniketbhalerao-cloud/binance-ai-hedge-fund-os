@@ -18,8 +18,6 @@ from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from models import OrderSide
-
 from market_data.exceptions import NormalizationError
 from market_data.interfaces import NormalizedData, RawPayload
 from market_data.models import (
@@ -28,6 +26,7 @@ from market_data.models import (
     PriceTick,
     TradeTick,
 )
+from models import OrderSide
 
 __all__ = ["DefaultNormalizer"]
 
@@ -50,7 +49,9 @@ def _dt(value: Any, field: str) -> datetime:
         try:
             parsed = datetime.fromisoformat(value)
         except ValueError as exc:
-            raise NormalizationError(f"Invalid datetime for {field!r}: {value!r}.") from exc
+            raise NormalizationError(
+                f"Invalid datetime for {field!r}: {value!r}."
+            ) from exc
         return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
     raise NormalizationError(f"Unsupported datetime for {field!r}: {value!r}.")
 

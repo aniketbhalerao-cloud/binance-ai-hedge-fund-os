@@ -133,9 +133,11 @@ class BinanceSpotAdapter(BaseExchangeAdapter):
             for b in (payload.get("balances", []) if isinstance(payload, dict) else [])
         )
         return BinanceAccount(
-            can_trade=bool(payload.get("canTrade", False))
-            if isinstance(payload, dict)
-            else False,
+            can_trade=(
+                bool(payload.get("canTrade", False))
+                if isinstance(payload, dict)
+                else False
+            ),
             balances=balances,
         )
 

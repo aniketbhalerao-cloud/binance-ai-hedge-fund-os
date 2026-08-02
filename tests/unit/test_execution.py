@@ -27,7 +27,11 @@ from execution import (
     ExecutionStatus,
     register_execution,
 )
-from execution.exceptions import ExecutionError, ExecutionLifecycleError, ExecutionRoutingError
+from execution.exceptions import (
+    ExecutionError,
+    ExecutionLifecycleError,
+    ExecutionRoutingError,
+)
 from models import OrderSide, OrderType
 from order_management.models import OrderIdentifier, OrderRequest
 from tests.support.execution_fakes import (
@@ -83,7 +87,9 @@ class ValidatorTests(unittest.TestCase):
 
 class RouterTests(unittest.TestCase):
     def test_default_destination(self) -> None:
-        self.assertEqual(DefaultExecutionRouter().route(_exec_request()).destination, "default")
+        self.assertEqual(
+            DefaultExecutionRouter().route(_exec_request()).destination, "default"
+        )
 
 
 class ExecutorTests(unittest.IsolatedAsyncioTestCase):
@@ -101,7 +107,9 @@ class EventAndExceptionTests(unittest.TestCase):
 
 
 class ManagerTests(unittest.IsolatedAsyncioTestCase):
-    def _manager(self, executor, validator, router) -> tuple[DefaultExecutionManager, EventBus]:
+    def _manager(
+        self, executor, validator, router
+    ) -> tuple[DefaultExecutionManager, EventBus]:
         bus = EventBus()
         manager = DefaultExecutionManager(
             bus, executor, validator, router, logger=FakeLoggerFactory()
@@ -110,7 +118,9 @@ class ManagerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_happy_path_ready(self) -> None:
         manager, bus = self._manager(
-            DefaultExecutionExecutor(), DefaultExecutionValidator(), DefaultExecutionRouter()
+            DefaultExecutionExecutor(),
+            DefaultExecutionValidator(),
+            DefaultExecutionRouter(),
         )
         completed = FakeSubscriber()
         bus.subscribe(ExecutionCompleted, completed.handle)
@@ -121,7 +131,9 @@ class ManagerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_not_ready_order_fails(self) -> None:
         manager, bus = self._manager(
-            DefaultExecutionExecutor(), DefaultExecutionValidator(), DefaultExecutionRouter()
+            DefaultExecutionExecutor(),
+            DefaultExecutionValidator(),
+            DefaultExecutionRouter(),
         )
         failed = FakeSubscriber()
         bus.subscribe(ExecutionFailed, failed.handle)
@@ -161,7 +173,9 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
     async def test_lifecycle_and_process(self) -> None:
         bus = EventBus()
         manager = DefaultExecutionManager(
-            bus, DefaultExecutionExecutor(), DefaultExecutionValidator(),
+            bus,
+            DefaultExecutionExecutor(),
+            DefaultExecutionValidator(),
             DefaultExecutionRouter(),
         )
         engine = DefaultExecutionEngine(manager, bus)
@@ -178,7 +192,9 @@ class DependencyInjectionTests(unittest.TestCase):
         engine = container.resolve(DefaultExecutionEngine)
         self.assertIs(container.resolve(DefaultExecutionEngine), engine)
         self.assertIs(container.resolve(ExecutionEngine), engine)
-        self.assertIsInstance(container.resolve(ExecutionManager), DefaultExecutionManager)
+        self.assertIsInstance(
+            container.resolve(ExecutionManager), DefaultExecutionManager
+        )
 
 
 if __name__ == "__main__":

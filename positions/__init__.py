@@ -152,7 +152,9 @@ def register_positions(container: Container) -> None:
     container.register_class(PositionRegistry, InMemoryPositionRegistry)
 
     def _build_manager(resolver: Resolver) -> DefaultPositionManager:
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return DefaultPositionManager(
             resolver.resolve(EventBus),
             resolver.resolve(PositionRegistry),
@@ -173,7 +175,9 @@ def register_positions(container: Container) -> None:
         from portfolio.interfaces import PortfolioEngine
         from trading.engine import TradingEngine
 
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return DefaultPositionEngine(
             resolver.resolve(PositionManager),
             logger=logger,

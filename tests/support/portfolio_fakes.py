@@ -9,7 +9,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 from decimal import Decimal
 
-from execution.models import ExecutionIdentifier, ExecutionRequest, ExecutionResult, ExecutionStatus
+from execution.models import (
+    ExecutionIdentifier,
+    ExecutionRequest,
+    ExecutionResult,
+    ExecutionStatus,
+)
 from execution.state import ExecutionState
 from models import OrderSide, OrderType, TimeInForce
 from order_management.models import OrderIdentifier, OrderRequest

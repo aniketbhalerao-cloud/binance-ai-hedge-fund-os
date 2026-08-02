@@ -82,7 +82,9 @@ class NormalizerTests(unittest.TestCase):
 
 class EventAndExceptionTests(unittest.TestCase):
     def test_market_events_inherit_event(self) -> None:
-        tick = PriceTick("sim", "BTCUSDT", Decimal("1"), __import__("datetime").datetime.now())
+        tick = PriceTick(
+            "sim", "BTCUSDT", Decimal("1"), __import__("datetime").datetime.now()
+        )
         self.assertIsInstance(PriceUpdated(tick=tick), Event)
 
     def test_exception_hierarchy(self) -> None:
@@ -109,7 +111,9 @@ class ProviderTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ServiceTests(unittest.IsolatedAsyncioTestCase):
-    def _service(self) -> tuple[MarketDataPipelineService, EventBus, FakeMarketDataProvider]:
+    def _service(
+        self,
+    ) -> tuple[MarketDataPipelineService, EventBus, FakeMarketDataProvider]:
         bus = EventBus()
         provider = FakeMarketDataProvider()
         service = MarketDataPipelineService(

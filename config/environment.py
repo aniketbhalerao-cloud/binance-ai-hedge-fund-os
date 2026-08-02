@@ -37,7 +37,7 @@ class Environment(str, Enum):
     PRODUCTION = "production"
 
     @classmethod
-    def from_str(cls, value: str | None) -> "Environment":
+    def from_str(cls, value: str | None) -> Environment:
         """Coerce an arbitrary string into an :class:`Environment`.
 
         Args:

@@ -64,8 +64,6 @@ _CONNECTION_TRANSITIONS: dict[ConnectionState, frozenset[ConnectionState]] = {
 }
 
 
-def can_connection_transition(
-    source: ConnectionState, target: ConnectionState
-) -> bool:
+def can_connection_transition(source: ConnectionState, target: ConnectionState) -> bool:
     """Return ``True`` if a connection may move from ``source`` to ``target``."""
     return target in _CONNECTION_TRANSITIONS.get(source, frozenset())

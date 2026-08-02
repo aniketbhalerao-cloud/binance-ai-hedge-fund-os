@@ -140,4 +140,6 @@ class StrategyExecutionManager:
 
     def _error(self, name: str, message: str) -> None:
         if self._log is not None:
-            self._log.error("Strategy failure", extra={"strategy": name, "error": message})
+            self._log.error(
+                "Strategy failure", extra={"strategy": name, "error": message}
+            )

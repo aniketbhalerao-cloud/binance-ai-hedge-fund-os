@@ -35,8 +35,9 @@ class PersistenceIntegrationTests(unittest.TestCase):
         orders = container.resolve(OrderRepository)
         self.assertIsInstance(orders, InMemoryOrderRepository)
         self.assertIs(orders.get("o1"), order)
-        self.assertEqual(container.resolve(PositionRepository).get("BTCUSDT").symbol,
-                         "BTCUSDT")
+        self.assertEqual(
+            container.resolve(PositionRepository).get("BTCUSDT").symbol, "BTCUSDT"
+        )
 
     def test_service_repository_and_logger_collaborate(self) -> None:
         container = ServiceContainer()
@@ -51,8 +52,9 @@ class PersistenceIntegrationTests(unittest.TestCase):
         # Repository stored the entity ...
         self.assertIsNotNone(container.resolve(OrderRepository).get("o1"))
         # ... and the logger recorded the operation.
-        self.assertIn("save_order",
-                      [message for _, message, _ in logger_factory.records])
+        self.assertIn(
+            "save_order", [message for _, message, _ in logger_factory.records]
+        )
 
     def test_persistence_service_is_singleton(self) -> None:
         container = ServiceContainer()

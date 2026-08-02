@@ -8,11 +8,10 @@ No exchange-specific order formats are implemented here.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 
 from models import OrderSide, OrderType, TimeInForce
-
 from order_management.models import OrderIdentifier, OrderMetadata, OrderRequest
 
 __all__ = ["MarketOrder", "LimitOrder", "StopOrder", "StopLimitOrder"]

@@ -23,10 +23,10 @@ from positions import (
 )
 from risk import register_risk
 from strategies import register_strategies
-from trading import register_trading_engine
 from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 from tests.support.market_data_fakes import FakeMarketDataProvider
 from tests.support.position_fakes import make_position_context
+from trading import register_trading_engine
 
 
 class PositionIntegrationTests(unittest.IsolatedAsyncioTestCase):
@@ -51,7 +51,9 @@ class PositionIntegrationTests(unittest.IsolatedAsyncioTestCase):
         bus.subscribe(PositionOpened, opened.handle)
 
         result = await engine.process(
-            make_position_context(side=OrderSide.BUY, quantity=Decimal("1"), price=Decimal("100"))
+            make_position_context(
+                side=OrderSide.BUY, quantity=Decimal("1"), price=Decimal("100")
+            )
         )
         self.assertEqual(result.status, PositionResultStatus.SUCCESS)
         assert result.position is not None
@@ -66,11 +68,15 @@ class PositionIntegrationTests(unittest.IsolatedAsyncioTestCase):
         bus.subscribe(PositionClosed, closed.handle)
 
         await engine.process(
-            make_position_context(side=OrderSide.BUY, quantity=Decimal("1"), price=Decimal("100"))
+            make_position_context(
+                side=OrderSide.BUY, quantity=Decimal("1"), price=Decimal("100")
+            )
         )
         result = await engine.process(
             make_position_context(
-                side=OrderSide.SELL, quantity=Decimal("1"), price=Decimal("140"),
+                side=OrderSide.SELL,
+                quantity=Decimal("1"),
+                price=Decimal("140"),
                 prices={"BTCUSDT": Decimal("140")},
             )
         )

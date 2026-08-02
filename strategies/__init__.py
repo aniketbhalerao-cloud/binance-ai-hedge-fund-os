@@ -116,8 +116,12 @@ def register_strategies(container: object) -> None:
         from market_data.interfaces import MarketDataService
         from trading.engine import TradingEngine
 
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
-        engine = resolver.resolve(TradingEngine) if resolver.has(TradingEngine) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
+        engine = (
+            resolver.resolve(TradingEngine) if resolver.has(TradingEngine) else None
+        )
         market_data = (
             resolver.resolve(MarketDataService)
             if resolver.has(MarketDataService)

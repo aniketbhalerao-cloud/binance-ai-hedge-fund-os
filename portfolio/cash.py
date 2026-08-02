@@ -9,7 +9,6 @@ from __future__ import annotations
 from decimal import Decimal
 
 from models import OrderSide
-
 from portfolio.exceptions import CashError
 from portfolio.models import PortfolioCash
 

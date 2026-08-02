@@ -24,9 +24,7 @@ class PositionState(str, Enum):
 #: Allowed transitions. ``OPEN`` / ``PARTIALLY_CLOSED`` may re-enter themselves as
 #: more fills arrive.
 VALID_TRANSITIONS: dict[PositionState, frozenset[PositionState]] = {
-    PositionState.PENDING: frozenset(
-        {PositionState.OPEN, PositionState.CANCELLED}
-    ),
+    PositionState.PENDING: frozenset({PositionState.OPEN, PositionState.CANCELLED}),
     PositionState.OPEN: frozenset(
         {
             PositionState.OPEN,
@@ -48,6 +46,9 @@ VALID_TRANSITIONS: dict[PositionState, frozenset[PositionState]] = {
 
 def can_transition(source: PositionState, target: PositionState) -> bool:
     """Return ``True`` if moving from ``source`` to ``target`` is permitted."""
-    if source == target and target in (PositionState.OPEN, PositionState.PARTIALLY_CLOSED):
+    if source == target and target in (
+        PositionState.OPEN,
+        PositionState.PARTIALLY_CLOSED,
+    ):
         return True
     return target in VALID_TRANSITIONS.get(source, frozenset())

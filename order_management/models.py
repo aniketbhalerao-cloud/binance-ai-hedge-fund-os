@@ -16,7 +16,6 @@ from types import MappingProxyType
 from typing import Any
 
 from models import OrderSide, OrderType, TimeInForce
-
 from order_management.state import OrderState
 
 __all__ = [

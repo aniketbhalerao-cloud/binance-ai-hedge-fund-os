@@ -15,8 +15,6 @@ __all__ = ["DefaultPositionHistory"]
 class DefaultPositionHistory:
     """Stateless, append-only history service."""
 
-    def append(
-        self, history: PositionHistory, trade: PositionTrade
-    ) -> PositionHistory:
+    def append(self, history: PositionHistory, trade: PositionTrade) -> PositionHistory:
         """Return a new history with ``trade`` appended."""
         return history.append(trade)

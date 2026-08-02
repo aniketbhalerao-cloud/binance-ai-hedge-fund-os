@@ -31,9 +31,7 @@ class EventBus:
 
     def __init__(self) -> None:
         # Handlers are keyed by the exact event type they subscribed to.
-        self._handlers: dict[type[Event], list[EventHandler[Event]]] = defaultdict(
-            list
-        )
+        self._handlers: dict[type[Event], list[EventHandler[Event]]] = defaultdict(list)
         # Guards mutation of ``_handlers`` so subscribe/unsubscribe/publish are
         # safe even if the bus is touched from multiple threads.
         self._lock = Lock()
@@ -112,9 +110,7 @@ class EventBus:
 
     # -- internals -----------------------------------------------------------
 
-    def _matching_handlers(
-        self, event_type: type[Event]
-    ) -> list[EventHandler[Event]]:
+    def _matching_handlers(self, event_type: type[Event]) -> list[EventHandler[Event]]:
         """Return a snapshot of handlers for ``event_type`` and its bases."""
         matched: list[EventHandler[Event]] = []
         with self._lock:

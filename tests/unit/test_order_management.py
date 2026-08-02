@@ -60,7 +60,9 @@ class ModelTests(unittest.TestCase):
         req = MarketOrder("BTCUSDT", OrderSide.BUY, Decimal("2")).to_request()
         self.assertEqual(req.order_type, OrderType.MARKET)
         self.assertEqual(req.quantity, Decimal("2"))
-        lim = LimitOrder("ETHUSDT", OrderSide.SELL, Decimal("1"), Decimal("100")).to_request()
+        lim = LimitOrder(
+            "ETHUSDT", OrderSide.SELL, Decimal("1"), Decimal("100")
+        ).to_request()
         self.assertEqual(lim.price, Decimal("100"))
 
 
@@ -101,7 +103,9 @@ class EventAndExceptionTests(unittest.TestCase):
 
 
 class ManagerTests(unittest.IsolatedAsyncioTestCase):
-    def _manager(self, factory, validator, router) -> tuple[DefaultOrderManager, EventBus]:
+    def _manager(
+        self, factory, validator, router
+    ) -> tuple[DefaultOrderManager, EventBus]:
         bus = EventBus()
         manager = DefaultOrderManager(
             bus, factory, validator, router, logger=FakeLoggerFactory()
@@ -121,7 +125,8 @@ class ManagerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_validation_failure_returns_rejected(self) -> None:
         manager, bus = self._manager(
-            FakeOrderFactory(), FakeOrderValidator(valid=False, errors=("bad",)),
+            FakeOrderFactory(),
+            FakeOrderValidator(valid=False, errors=("bad",)),
             DefaultOrderRouter(),
         )
         rejected = FakeSubscriber()
@@ -137,7 +142,9 @@ class ManagerTests(unittest.IsolatedAsyncioTestCase):
             FakeOrderRouter(error=OrderRoutingError("no route")),
         )
         result = await manager.process(make_order_context())
-        self.assertEqual(result.state, OrderState.REJECTED)  # produced a result, no crash
+        self.assertEqual(
+            result.state, OrderState.REJECTED
+        )  # produced a result, no crash
 
     async def test_factory_failure_is_isolated(self) -> None:
         manager, bus = self._manager(

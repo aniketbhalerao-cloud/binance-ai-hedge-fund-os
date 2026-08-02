@@ -19,9 +19,9 @@ from market_data import (
     PriceUpdated,
     register_market_data,
 )
-from trading import TradingEngine, register_trading_engine
 from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 from tests.support.market_data_fakes import FakeMarketDataProvider, make_tick_payload
+from trading import TradingEngine, register_trading_engine
 
 
 class MarketDataIntegrationTests(unittest.IsolatedAsyncioTestCase):

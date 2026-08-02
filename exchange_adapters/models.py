@@ -15,9 +15,8 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any
 
-from execution.models import ExecutionRequest, ExecutionRoute
-
 from exchange_adapters.state import AuthenticationState, ConnectionState
+from execution.models import ExecutionRequest, ExecutionRoute
 
 __all__ = [
     "ExchangeStatus",

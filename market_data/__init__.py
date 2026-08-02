@@ -133,7 +133,9 @@ def register_market_data(
     def _build_service(resolver: Resolver) -> MarketDataPipelineService:
         from trading.engine import TradingEngine
 
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         engine = (
             resolver.resolve(TradingEngine) if resolver.has(TradingEngine) else None
         )

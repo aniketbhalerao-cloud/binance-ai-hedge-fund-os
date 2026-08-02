@@ -166,7 +166,9 @@ def register_exchange_adapters(container: Container) -> None:
     container.register_class(ExchangeRegistry, ExchangeAdapterRegistry)
 
     def _build_manager(resolver: Resolver) -> DefaultExchangeManager:
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return DefaultExchangeManager(
             resolver.resolve(EventBus),
             resolver.resolve(ExchangeAuthentication),
@@ -186,7 +188,9 @@ def register_exchange_adapters(container: Container) -> None:
         from execution.interfaces import ExecutionEngine
         from trading.engine import TradingEngine
 
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return DefaultExchangeEngine(
             resolver.resolve(ExchangeManager),
             resolver.resolve(EventBus),

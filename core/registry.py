@@ -63,9 +63,7 @@ class ServiceRegistry:
         try:
             registration = self._registrations[key]
         except KeyError as exc:
-            raise KeyError(
-                f"No registration found for {key.__name__!r}."
-            ) from exc
+            raise KeyError(f"No registration found for {key.__name__!r}.") from exc
         # The registry stores objects invariantly; the public API restores the
         # precise generic type that was recorded via :meth:`register`.
         return cast(Registration[T], registration)

@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import unittest
 
-from adapters.binance import BINANCE_ADAPTER_NAME, BinanceSpotAdapter, register_binance_adapter
+from adapters.binance import (
+    BINANCE_ADAPTER_NAME,
+    BinanceSpotAdapter,
+    register_binance_adapter,
+)
 from adapters.binance.events import BinanceOrderSubmitted
 from core.container import ServiceContainer
 from core.logging import LoggerFactory
@@ -15,13 +19,19 @@ from exchange_adapters import (
     ExchangeStatus,
     register_exchange_adapters,
 )
-from tests.support.binance_fakes import FakeHttpTransport, make_config, make_exchange_request
+from tests.support.binance_fakes import (
+    FakeHttpTransport,
+    make_config,
+    make_exchange_request,
+)
 from tests.support.exchange_fakes import make_exchange_context
 from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 
 
 class BinanceIntegrationTests(unittest.IsolatedAsyncioTestCase):
-    def _container(self, transport: FakeHttpTransport | None = None) -> ServiceContainer:
+    def _container(
+        self, transport: FakeHttpTransport | None = None
+    ) -> ServiceContainer:
         container = ServiceContainer()
         container.register_instance(LoggerFactory, FakeLoggerFactory())  # type: ignore[arg-type]
         register_exchange_adapters(container)

@@ -39,7 +39,9 @@ class DefaultRiskPolicy:
     def decide(self, result: RiskResult, context: RiskContext) -> RiskDecision:
         """Map ``result`` to an approval :class:`RiskDecision`."""
         decision_type = (
-            RiskDecisionType.REJECTED if result.violations else RiskDecisionType.APPROVED
+            RiskDecisionType.REJECTED
+            if result.violations
+            else RiskDecisionType.APPROVED
         )
         return RiskDecision(
             id=uuid.uuid4().hex,
@@ -101,7 +103,9 @@ class RiskEvaluationManager:
             await self._bus.publish(RiskDecisionRejected(decision=decision))
 
         await self._bus.publish(RiskEvaluationCompleted(decision=decision))
-        self._info(f"Risk evaluation completed: {decision.decision_type.value}", context.symbol)
+        self._info(
+            f"Risk evaluation completed: {decision.decision_type.value}", context.symbol
+        )
         return decision
 
     def _info(self, message: str, symbol: str) -> None:

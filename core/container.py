@@ -40,7 +40,9 @@ class ServiceContainer:
     """
 
     def __init__(self, registry: Registry | None = None) -> None:
-        self._registry: Registry = registry if registry is not None else ServiceRegistry()
+        self._registry: Registry = (
+            registry if registry is not None else ServiceRegistry()
+        )
         self._singletons: dict[type[object], object] = {}
         self._resolving: set[type[object]] = set()
         self._lock = RLock()
@@ -77,9 +79,7 @@ class ServiceContainer:
         The instance is cached immediately and returned by every resolve.
         """
         with self._lock:
-            self._registry.register(
-                key, lambda _resolver: instance, Lifetime.SINGLETON
-            )
+            self._registry.register(key, lambda _resolver: instance, Lifetime.SINGLETON)
             self._singletons[key] = instance
 
     # -- resolution ----------------------------------------------------------

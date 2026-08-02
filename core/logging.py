@@ -169,9 +169,7 @@ class JsonFormatter(logging.Formatter):
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
-            "correlation_id": getattr(
-                record, "correlation_id", get_correlation_id()
-            ),
+            "correlation_id": getattr(record, "correlation_id", get_correlation_id()),
             "module": record.module,
             "function": record.funcName,
             "line": record.lineno,
@@ -188,8 +186,7 @@ class TextFormatter(logging.Formatter):
     """Human-readable console formatter that includes the correlation ID."""
 
     DEFAULT_FORMAT = (
-        "%(asctime)s | %(levelname)-8s | %(name)s | "
-        "%(correlation_id)s | %(message)s"
+        "%(asctime)s | %(levelname)-8s | %(name)s | " "%(correlation_id)s | %(message)s"
     )
 
     def __init__(self, fmt: str | None = None) -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import unittest
+from decimal import Decimal
 
 from core.container import ServiceContainer
 from events.base import Event
@@ -18,14 +19,12 @@ from exchange_adapters import (
     DefaultExchangeValidator,
     ExchangeAdapterRegistered,
     ExchangeAdapterRegistry,
-    ExchangeAuthenticationSucceeded,
     ExchangeConnectionOpened,
     ExchangeEngine,
     ExchangeManager,
     ExchangeMetadata,
     ExchangeRequest,
     ExchangeStatus,
-    ExchangeValidationFailed,
     register_exchange_adapters,
 )
 from exchange_adapters.authentication import DefaultExchangeAuthentication
@@ -35,7 +34,6 @@ from execution.models import ExecutionIdentifier, ExecutionRequest
 from execution.state import ExecutionState
 from models import OrderSide, OrderType
 from order_management.models import OrderIdentifier, OrderRequest
-from decimal import Decimal
 from tests.support.exchange_fakes import (
     FakeAuthentication,
     FakeConnection,
@@ -47,16 +45,24 @@ from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 
 def _exchange_request(**kw: object) -> ExchangeRequest:
     order = OrderRequest(
-        identifier=OrderIdentifier(), symbol="BTCUSDT", side=OrderSide.BUY,
-        order_type=OrderType.MARKET, quantity=Decimal("1"),
+        identifier=OrderIdentifier(),
+        symbol="BTCUSDT",
+        side=OrderSide.BUY,
+        order_type=OrderType.MARKET,
+        quantity=Decimal("1"),
     )
     exec_req = ExecutionRequest(
-        identifier=ExecutionIdentifier(), order_request=order, exchange="sim",
-        symbol="BTCUSDT", state=ExecutionState.READY,
+        identifier=ExecutionIdentifier(),
+        order_request=order,
+        exchange="sim",
+        symbol="BTCUSDT",
+        state=ExecutionState.READY,
     )
     base = dict(
-        identifier=ExchangeIdentifier(), execution_request=exec_req,
-        exchange="sim", symbol="BTCUSDT",
+        identifier=ExchangeIdentifier(),
+        execution_request=exec_req,
+        exchange="sim",
+        symbol="BTCUSDT",
     )
     base.update(kw)
     return ExchangeRequest(**base)  # type: ignore[arg-type]
@@ -124,7 +130,9 @@ class EventAndExceptionTests(unittest.TestCase):
 
 
 class ManagerTests(unittest.IsolatedAsyncioTestCase):
-    def _manager(self, *, auth=None, conn=None, registry=None) -> tuple[DefaultExchangeManager, EventBus, ExchangeAdapterRegistry]:
+    def _manager(
+        self, *, auth=None, conn=None, registry=None
+    ) -> tuple[DefaultExchangeManager, EventBus, ExchangeAdapterRegistry]:
         bus = EventBus()
         registry = registry or ExchangeAdapterRegistry()
         manager = DefaultExchangeManager(
@@ -163,9 +171,7 @@ class ManagerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, ExchangeStatus.FAILED)
 
     async def test_connection_failure_isolated(self) -> None:
-        manager, bus, _ = self._manager(
-            conn=FakeConnection(ConnectionState.CLOSED)
-        )
+        manager, bus, _ = self._manager(conn=FakeConnection(ConnectionState.CLOSED))
         result = await manager.process(make_exchange_context())
         self.assertEqual(result.status, ExchangeStatus.FAILED)
 
@@ -186,8 +192,11 @@ class EngineTests(unittest.IsolatedAsyncioTestCase):
     async def test_lifecycle_and_process(self) -> None:
         bus = EventBus()
         manager = DefaultExchangeManager(
-            bus, DefaultExchangeAuthentication(), DefaultExchangeConnection(),
-            DefaultExchangeValidator(), DefaultExchangeRouter(),
+            bus,
+            DefaultExchangeAuthentication(),
+            DefaultExchangeConnection(),
+            DefaultExchangeValidator(),
+            DefaultExchangeRouter(),
             ExchangeAdapterRegistry(),
         )
         engine = DefaultExchangeEngine(manager, bus)
@@ -204,7 +213,9 @@ class DependencyInjectionTests(unittest.TestCase):
         engine = container.resolve(DefaultExchangeEngine)
         self.assertIs(container.resolve(DefaultExchangeEngine), engine)
         self.assertIs(container.resolve(ExchangeEngine), engine)
-        self.assertIsInstance(container.resolve(ExchangeManager), DefaultExchangeManager)
+        self.assertIsInstance(
+            container.resolve(ExchangeManager), DefaultExchangeManager
+        )
 
 
 if __name__ == "__main__":

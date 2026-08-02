@@ -33,9 +33,7 @@ class OrderState(str, Enum):
 VALID_TRANSITIONS: dict[OrderState, frozenset[OrderState]] = {
     OrderState.CREATED: frozenset({OrderState.VALIDATED, OrderState.REJECTED}),
     OrderState.VALIDATED: frozenset({OrderState.ROUTED, OrderState.REJECTED}),
-    OrderState.ROUTED: frozenset(
-        {OrderState.READY_FOR_EXECUTION, OrderState.REJECTED}
-    ),
+    OrderState.ROUTED: frozenset({OrderState.READY_FOR_EXECUTION, OrderState.REJECTED}),
     OrderState.READY_FOR_EXECUTION: frozenset({OrderState.SUBMITTED}),
     OrderState.SUBMITTED: frozenset(
         {

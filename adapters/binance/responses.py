@@ -7,9 +7,10 @@ adapter; callers receive standardized
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any, Mapping
+from typing import Any
 
 from adapters.binance.errors import BinanceResponseError
 from adapters.binance.models import BinanceOrderStatus
@@ -28,7 +29,7 @@ class BinanceOrderResponse:
     executed_qty: Decimal
 
     @classmethod
-    def from_payload(cls, payload: Mapping[str, Any]) -> "BinanceOrderResponse":
+    def from_payload(cls, payload: Mapping[str, Any]) -> BinanceOrderResponse:
         """Build a response from a raw Binance payload.
 
         Raises:

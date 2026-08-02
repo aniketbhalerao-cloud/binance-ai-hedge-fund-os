@@ -6,7 +6,8 @@ non-sensitive fields (order id, status) are surfaced to the rest of the system.
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from collections.abc import Mapping
+from typing import Any
 
 from adapters.binance.models import BinanceOrderStatus
 from adapters.binance.responses import BinanceOrderResponse
@@ -28,9 +29,7 @@ class BinanceResponseParser:
         """Parse a raw order payload into a Binance response model."""
         return BinanceOrderResponse.from_payload(payload)
 
-    def to_exchange_response(
-        self, order: BinanceOrderResponse
-    ) -> ExchangeResponse:
+    def to_exchange_response(self, order: BinanceOrderResponse) -> ExchangeResponse:
         """Convert a Binance order response into a standardized response."""
         return ExchangeResponse(
             accepted=order.status in _ACCEPTED,

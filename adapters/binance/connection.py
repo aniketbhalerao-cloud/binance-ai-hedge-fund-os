@@ -11,11 +11,6 @@ from __future__ import annotations
 
 from threading import Lock
 
-from core.logging import LoggerFactory
-from events.bus import EventBus
-from exchange_adapters.context import ExchangeContext
-from exchange_adapters.state import ConnectionState
-
 from adapters.binance.events import (
     BinanceConnected,
     BinanceDisconnected,
@@ -23,6 +18,10 @@ from adapters.binance.events import (
     BinanceReconnectStarted,
     BinanceReconnectSucceeded,
 )
+from core.logging import LoggerFactory
+from events.bus import EventBus
+from exchange_adapters.context import ExchangeContext
+from exchange_adapters.state import ConnectionState
 
 __all__ = ["BinanceConnection"]
 

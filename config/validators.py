@@ -151,9 +151,7 @@ def validate_secret(
     """
     candidate = value.strip()
     if len(candidate) < min_length:
-        raise ValueError(
-            f"{field} must be at least {min_length} characters long."
-        )
+        raise ValueError(f"{field} must be at least {min_length} characters long.")
     return candidate
 
 
@@ -181,9 +179,7 @@ def validate_fraction(
     lower_ok = value >= 0 if allow_zero else value > 0
     if not lower_ok or value > upper:
         bound = "[0" if allow_zero else "(0"
-        raise ValueError(
-            f"{field} must be within {bound}, {upper}], got {value}."
-        )
+        raise ValueError(f"{field} must be within {bound}, {upper}], got {value}.")
     return value
 
 

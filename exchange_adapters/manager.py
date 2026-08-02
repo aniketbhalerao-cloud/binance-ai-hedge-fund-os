@@ -93,7 +93,9 @@ class DefaultExchangeManager:
         auth_state = await self._auth.authenticate(context)
         if auth_state is not AuthenticationState.AUTHENTICATED:
             await self._bus.publish(
-                ExchangeAuthenticationFailed(exchange=exchange, reason="not authenticated")
+                ExchangeAuthenticationFailed(
+                    exchange=exchange, reason="not authenticated"
+                )
             )
             self._info("Authentication failed")
             return ExchangeResult(
@@ -184,7 +186,9 @@ class DefaultExchangeManager:
                     connection_state=ConnectionState.CLOSED,
                     errors=(str(exc),),
                 )
-            status = ExchangeStatus.READY if response.accepted else ExchangeStatus.REJECTED
+            status = (
+                ExchangeStatus.READY if response.accepted else ExchangeStatus.REJECTED
+            )
 
         await self._close(exchange)
         self._info("Exchange request ready for broker adapter")

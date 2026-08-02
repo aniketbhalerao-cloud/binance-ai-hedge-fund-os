@@ -167,7 +167,9 @@ def register_portfolio(container: Container) -> None:
     container.register_class(PortfolioRegistry, InMemoryPortfolioRegistry)
 
     def _build_manager(resolver: Resolver) -> DefaultPortfolioManager:
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return DefaultPortfolioManager(
             resolver.resolve(EventBus),
             resolver.resolve(PortfolioRegistry),
@@ -190,7 +192,9 @@ def register_portfolio(container: Container) -> None:
         from execution.interfaces import ExecutionEngine
         from trading.engine import TradingEngine
 
-        logger = resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        logger = (
+            resolver.resolve(LoggerFactory) if resolver.has(LoggerFactory) else None
+        )
         return DefaultPortfolioEngine(
             resolver.resolve(PortfolioManager),
             logger=logger,

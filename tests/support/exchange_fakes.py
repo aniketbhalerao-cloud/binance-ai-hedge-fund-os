@@ -11,14 +11,17 @@ from decimal import Decimal
 from exchange_adapters.adapter import BaseExchangeAdapter
 from exchange_adapters.context import ExchangeContext
 from exchange_adapters.models import (
-    ExchangeMetadata,
     ExchangeRequest,
     ExchangeResponse,
 )
 from exchange_adapters.state import AuthenticationState, ConnectionState
-from execution.models import ExecutionIdentifier, ExecutionRequest, ExecutionResult
+from execution.models import (
+    ExecutionIdentifier,
+    ExecutionRequest,
+    ExecutionResult,
+    ExecutionStatus,
+)
 from execution.state import ExecutionState
-from execution.models import ExecutionStatus
 from models import OrderSide, OrderType
 from order_management.models import OrderIdentifier, OrderRequest
 
@@ -33,7 +36,9 @@ __all__ = [
 class FakeExchangeAdapter(BaseExchangeAdapter):
     """An adapter that accepts requests (or raises if configured)."""
 
-    def __init__(self, name: str = "default", *, error: Exception | None = None) -> None:
+    def __init__(
+        self, name: str = "default", *, error: Exception | None = None
+    ) -> None:
         super().__init__(name)
         self._error = error
         self.submitted: list[ExchangeRequest] = []
@@ -48,7 +53,9 @@ class FakeExchangeAdapter(BaseExchangeAdapter):
 class FakeAuthentication:
     """Authentication stub returning a configurable state."""
 
-    def __init__(self, state: AuthenticationState = AuthenticationState.AUTHENTICATED) -> None:
+    def __init__(
+        self, state: AuthenticationState = AuthenticationState.AUTHENTICATED
+    ) -> None:
         self._state = state
 
     async def authenticate(self, context: ExchangeContext) -> AuthenticationState:
@@ -69,7 +76,11 @@ class FakeConnection:
 
 
 def make_exchange_context(
-    *, exchange: str = "sim", symbol: str = "BTCUSDT", ready: bool = True, adapter: str | None = None
+    *,
+    exchange: str = "sim",
+    symbol: str = "BTCUSDT",
+    ready: bool = True,
+    adapter: str | None = None,
 ) -> ExchangeContext:
     """Build a deterministic ExchangeContext from a ready ExecutionResult."""
     order_request = OrderRequest(
@@ -93,5 +104,8 @@ def make_exchange_context(
     )
     metadata = {"adapter": adapter} if adapter else {}
     return ExchangeContext(
-        execution_result=exec_result, exchange=exchange, symbol=symbol, metadata=metadata
+        execution_result=exec_result,
+        exchange=exchange,
+        symbol=symbol,
+        metadata=metadata,
     )

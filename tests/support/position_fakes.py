@@ -46,9 +46,7 @@ def make_position_context(
         state=PortfolioState.ACTIVE,
         ledger=(entry,),
     )
-    result = PortfolioResult(
-        status=PortfolioResultStatus.SUCCESS, portfolio=portfolio
-    )
+    result = PortfolioResult(status=PortfolioResultStatus.SUCCESS, portfolio=portfolio)
     return PositionContext(
         portfolio_result=result,
         prices=prices if prices is not None else {symbol: price},

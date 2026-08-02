@@ -18,10 +18,10 @@ from market_data import register_market_data
 from order_management import register_order_management
 from risk import register_risk
 from strategies import register_strategies
-from trading import register_trading_engine
 from tests.support.execution_fakes import make_execution_context
 from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 from tests.support.market_data_fakes import FakeMarketDataProvider
+from trading import register_trading_engine
 
 
 class ExecutionIntegrationTests(unittest.IsolatedAsyncioTestCase):

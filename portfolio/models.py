@@ -13,7 +13,6 @@ from decimal import Decimal
 from enum import Enum
 
 from models import OrderSide
-
 from portfolio.state import PortfolioState
 
 __all__ = [

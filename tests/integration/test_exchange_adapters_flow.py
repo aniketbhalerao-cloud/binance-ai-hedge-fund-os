@@ -10,7 +10,6 @@ from events.bus import EventBus
 from exchange_adapters import (
     DefaultExchangeEngine,
     ExchangeAdapterRegistry,
-    ExchangeEngineStarted,
     ExchangeRegistry,
     ExchangeRoutingCompleted,
     ExchangeStatus,
@@ -21,10 +20,10 @@ from market_data import register_market_data
 from order_management import register_order_management
 from risk import register_risk
 from strategies import register_strategies
-from trading import register_trading_engine
 from tests.support.exchange_fakes import FakeExchangeAdapter, make_exchange_context
 from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 from tests.support.market_data_fakes import FakeMarketDataProvider
+from trading import register_trading_engine
 
 
 class ExchangeIntegrationTests(unittest.IsolatedAsyncioTestCase):
@@ -70,7 +69,9 @@ class ExchangeIntegrationTests(unittest.IsolatedAsyncioTestCase):
             container.resolve(DefaultExchangeEngine),
             container.resolve(DefaultExchangeEngine),
         )
-        self.assertIsInstance(container.resolve(ExchangeRegistry), ExchangeAdapterRegistry)
+        self.assertIsInstance(
+            container.resolve(ExchangeRegistry), ExchangeAdapterRegistry
+        )
 
 
 if __name__ == "__main__":

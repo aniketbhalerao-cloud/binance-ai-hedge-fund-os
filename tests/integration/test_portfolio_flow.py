@@ -21,10 +21,10 @@ from portfolio import (
 )
 from risk import register_risk
 from strategies import register_strategies
-from trading import register_trading_engine
 from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 from tests.support.market_data_fakes import FakeMarketDataProvider
 from tests.support.portfolio_fakes import make_portfolio_context
+from trading import register_trading_engine
 
 
 class PortfolioIntegrationTests(unittest.IsolatedAsyncioTestCase):
@@ -60,7 +60,8 @@ class PortfolioIntegrationTests(unittest.IsolatedAsyncioTestCase):
         await engine.process(make_portfolio_context(side=OrderSide.BUY))
         result = await engine.process(
             make_portfolio_context(
-                side=OrderSide.SELL, price=Decimal("130"),
+                side=OrderSide.SELL,
+                price=Decimal("130"),
                 prices={"BTCUSDT": Decimal("130")},
             )
         )

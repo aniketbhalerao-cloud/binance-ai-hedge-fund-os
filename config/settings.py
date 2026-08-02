@@ -46,7 +46,6 @@ from config.validators import (
     validate_fraction,
     validate_non_negative,
     validate_port,
-    validate_positive,
     validate_secret,
     validate_url,
 )
@@ -134,9 +133,7 @@ class DatabaseSettings(BaseSettings):
     @field_validator("url")
     @classmethod
     def _check_url(cls, value: str) -> str:
-        return validate_url(
-            value, schemes=DATABASE_SCHEMES, field="DATABASE_URL"
-        )
+        return validate_url(value, schemes=DATABASE_SCHEMES, field="DATABASE_URL")
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +252,7 @@ class RiskSettings(BaseSettings):
         return value
 
     @model_validator(mode="after")
-    def _check_drawdown_ordering(self) -> "RiskSettings":
+    def _check_drawdown_ordering(self) -> RiskSettings:
         if self.max_daily_drawdown_pct > self.max_total_drawdown_pct:
             raise ValueError(
                 "RISK_MAX_DAILY_DRAWDOWN_PCT cannot exceed "
@@ -399,7 +396,9 @@ class Settings(BaseSettings):
 
     environment: Environment = Environment.DEVELOPMENT
 
-    application: Annotated[ApplicationSettings, Field(default_factory=ApplicationSettings)]
+    application: Annotated[
+        ApplicationSettings, Field(default_factory=ApplicationSettings)
+    ]
     binance: Annotated[BinanceSettings, Field(default_factory=BinanceSettings)]
     database: Annotated[DatabaseSettings, Field(default_factory=DatabaseSettings)]
     redis: Annotated[RedisSettings, Field(default_factory=RedisSettings)]
@@ -418,7 +417,7 @@ class Settings(BaseSettings):
     # -- cross-section validation -------------------------------------------
 
     @model_validator(mode="after")
-    def _validate_environment(self) -> "Settings":
+    def _validate_environment(self) -> Settings:
         """Enforce consistency between environment, trading mode, and secrets."""
         env = self.environment
         mode = self.trading.mode

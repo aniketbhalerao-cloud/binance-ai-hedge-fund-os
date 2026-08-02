@@ -7,13 +7,12 @@ consumes only these standardized models. Money/quantities use
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
 from models import OrderSide
-
 from positions.state import PositionState
 
 __all__ = [
@@ -98,7 +97,7 @@ class PositionHistory:
     position_id: str
     trades: tuple[PositionTrade, ...] = ()
 
-    def append(self, trade: PositionTrade) -> "PositionHistory":
+    def append(self, trade: PositionTrade) -> PositionHistory:
         """Return a new history with ``trade`` appended (never mutates)."""
         return PositionHistory(self.position_id, self.trades + (trade,))
 

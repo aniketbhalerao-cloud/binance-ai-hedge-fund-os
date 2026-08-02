@@ -14,11 +14,10 @@ from datetime import UTC, datetime
 from decimal import Decimal
 from threading import Lock
 
-from models import OrderSide
-
 from core.logging import LoggerFactory
 from events.base import Event
 from events.bus import EventBus
+from models import OrderSide
 from portfolio.context import PortfolioContext
 from portfolio.events import (
     AllocationUpdated,
@@ -57,9 +56,7 @@ from portfolio.state import PortfolioState
 __all__ = ["DefaultPortfolioManager"]
 
 
-def _realized_delta(
-    entry: LedgerEntry, position: PortfolioPosition | None
-) -> Decimal:
+def _realized_delta(entry: LedgerEntry, position: PortfolioPosition | None) -> Decimal:
     """Realized P&L booked by this fill (non-zero only on a sell of a held lot)."""
     if entry.side is OrderSide.SELL and position is not None:
         return entry.quantity * (entry.price - position.average_cost)
@@ -101,7 +98,9 @@ class DefaultPortfolioManager:
             result = self._compute(context, events)
         except PortfolioError as exc:
             self._error(pid, str(exc))
-            await self._bus.publish(PortfolioErrorOccurred(portfolio_id=pid, message=str(exc)))
+            await self._bus.publish(
+                PortfolioErrorOccurred(portfolio_id=pid, message=str(exc))
+            )
             existing = self._registry.get(pid) if self._registry.exists(pid) else None
             return PortfolioResult(
                 status=PortfolioResultStatus.FAILED,
@@ -208,9 +207,7 @@ class DefaultPortfolioManager:
             )
             self._registry.update(closed)
         await self._bus.publish(PortfolioClosed(portfolio_id=portfolio_id))
-        return PortfolioResult(
-            status=PortfolioResultStatus.SUCCESS, portfolio=closed
-        )
+        return PortfolioResult(status=PortfolioResultStatus.SUCCESS, portfolio=closed)
 
     def _info(self, message: str, pid: str) -> None:
         if self._log is not None:
@@ -218,4 +215,6 @@ class DefaultPortfolioManager:
 
     def _error(self, pid: str, message: str) -> None:
         if self._log is not None:
-            self._log.error("Portfolio error", extra={"portfolio_id": pid, "error": message})
+            self._log.error(
+                "Portfolio error", extra={"portfolio_id": pid, "error": message}
+            )

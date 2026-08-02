@@ -9,7 +9,6 @@ indicator calculation, exchange access, or submission.
 from __future__ import annotations
 
 from models import OrderType
-
 from order_management.models import OrderRequest, OrderValidationResult
 
 __all__ = ["DefaultOrderValidator"]
@@ -32,7 +31,9 @@ class DefaultOrderValidator:
 
         if request.order_type in _PRICE_REQUIRED:
             if request.price is None or request.price <= 0:
-                errors.append(f"{request.order_type.value} order requires a positive price")
+                errors.append(
+                    f"{request.order_type.value} order requires a positive price"
+                )
         if request.order_type in _STOP_REQUIRED:
             if request.stop_price is None or request.stop_price <= 0:
                 errors.append(

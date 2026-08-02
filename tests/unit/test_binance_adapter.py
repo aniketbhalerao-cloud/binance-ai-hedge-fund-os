@@ -91,7 +91,9 @@ class TranslatorValidatorParserTests(unittest.TestCase):
 
     def test_validator_flags_bad_quantity(self) -> None:
         bad = BinanceOrderRequest(
-            symbol="BTCUSDT", side=BinanceSide.BUY, type=BinanceOrderType.MARKET,
+            symbol="BTCUSDT",
+            side=BinanceSide.BUY,
+            type=BinanceOrderType.MARKET,
             quantity=Decimal("0"),
         )
         self.assertTrue(BinanceRequestValidator().validate(bad))
@@ -109,8 +111,11 @@ class RestClientTests(unittest.IsolatedAsyncioTestCase):
         bus = EventBus()
         transport = FakeHttpTransport()
         rest = BinanceRESTClient(
-            transport, make_config(), BinanceAuthentication(make_config(), BinanceSigner()),
-            bus, logger=FakeLoggerFactory(),
+            transport,
+            make_config(),
+            BinanceAuthentication(make_config(), BinanceSigner()),
+            bus,
+            logger=FakeLoggerFactory(),
         )
         payload = await rest.post(ORDER, {"symbol": "BTCUSDT"})
         self.assertEqual(payload, ORDER_PAYLOAD)
@@ -152,14 +157,22 @@ class WebSocketConnectionTests(unittest.IsolatedAsyncioTestCase):
 
 
 class AdapterTests(unittest.IsolatedAsyncioTestCase):
-    def _adapter(self, *, transport: FakeHttpTransport | None = None, creds: bool = True) -> tuple[BinanceSpotAdapter, EventBus]:
+    def _adapter(
+        self, *, transport: FakeHttpTransport | None = None, creds: bool = True
+    ) -> tuple[BinanceSpotAdapter, EventBus]:
         bus = EventBus()
         config = make_config(creds=creds)
         auth = BinanceAuthentication(config, BinanceSigner())
         rest = BinanceRESTClient(transport or FakeHttpTransport(), config, auth, bus)
         adapter = BinanceSpotAdapter(
-            auth, BinanceConnection(bus), rest, BinanceRequestTranslator(),
-            BinanceRequestValidator(), BinanceResponseParser(), bus, config,
+            auth,
+            BinanceConnection(bus),
+            rest,
+            BinanceRequestTranslator(),
+            BinanceRequestValidator(),
+            BinanceResponseParser(),
+            bus,
+            config,
             logger=FakeLoggerFactory(),
         )
         return adapter, bus
@@ -183,9 +196,12 @@ class AdapterTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(response.accepted)
 
     async def test_get_account(self) -> None:
-        transport = FakeHttpTransport(payload={"canTrade": True, "balances": [
-            {"asset": "USDT", "free": "100", "locked": "0"}
-        ]})
+        transport = FakeHttpTransport(
+            payload={
+                "canTrade": True,
+                "balances": [{"asset": "USDT", "free": "100", "locked": "0"}],
+            }
+        )
         adapter, bus = self._adapter(transport=transport)
         account = await adapter.get_account()
         self.assertTrue(account.can_trade)

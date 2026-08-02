@@ -51,7 +51,9 @@ class StateModelTests(unittest.TestCase):
         self.assertFalse(can_transition(PositionState.CLOSED, PositionState.OPEN))
 
     def test_position_immutable(self) -> None:
-        pos = Position(id="p", symbol="BTC", side=PositionSide.LONG, state=PositionState.OPEN)
+        pos = Position(
+            id="p", symbol="BTC", side=PositionSide.LONG, state=PositionState.OPEN
+        )
         with self.assertRaises(dataclasses.FrozenInstanceError):
             pos.quantity = Decimal("1")  # type: ignore[misc]
 
@@ -108,7 +110,9 @@ class ComponentTests(unittest.TestCase):
     def test_metrics(self) -> None:
         trades = [_trade(OrderSide.BUY, "1", "100"), _trade(OrderSide.SELL, "1", "120")]
         calc = DefaultPositionCalculator().calculate(trades, {}, datetime.now(UTC))
-        m = DefaultPositionMetrics().compute(PositionHistory("BTC", tuple(trades)), calc)
+        m = DefaultPositionMetrics().compute(
+            PositionHistory("BTC", tuple(trades)), calc
+        )
         self.assertEqual(m.win_rate, Decimal("1"))
         self.assertEqual(m.trade_count, 2)
 
@@ -117,7 +121,9 @@ class RegistryTests(unittest.TestCase):
     def test_register_and_missing(self) -> None:
         reg = InMemoryPositionRegistry()
         reg.register(
-            Position(id="BTC", symbol="BTC", side=PositionSide.LONG, state=PositionState.OPEN),
+            Position(
+                id="BTC", symbol="BTC", side=PositionSide.LONG, state=PositionState.OPEN
+            ),
             PositionHistory("BTC"),
         )
         self.assertTrue(reg.exists("BTC"))
@@ -155,20 +161,26 @@ class ManagerTests(unittest.IsolatedAsyncioTestCase):
         bus.subscribe(PositionClosed, closed.handle)
 
         r1 = await manager.update(
-            make_position_context(side=OrderSide.BUY, quantity=Decimal("2"), price=Decimal("100"))
+            make_position_context(
+                side=OrderSide.BUY, quantity=Decimal("2"), price=Decimal("100")
+            )
         )
         self.assertEqual(r1.position.state, PositionState.OPEN)  # type: ignore[union-attr]
         self.assertEqual(len(opened.received), 1)
 
         await manager.update(
             make_position_context(
-                side=OrderSide.SELL, quantity=Decimal("1"), price=Decimal("120"),
+                side=OrderSide.SELL,
+                quantity=Decimal("1"),
+                price=Decimal("120"),
                 prices={"BTCUSDT": Decimal("120")},
             )
         )
         r3 = await manager.update(
             make_position_context(
-                side=OrderSide.SELL, quantity=Decimal("1"), price=Decimal("130"),
+                side=OrderSide.SELL,
+                quantity=Decimal("1"),
+                price=Decimal("130"),
                 prices={"BTCUSDT": Decimal("130")},
             )
         )
@@ -197,7 +209,9 @@ class DependencyInjectionTests(unittest.TestCase):
         register_positions(container)
         engine = container.resolve(DefaultPositionEngine)
         self.assertIs(container.resolve(DefaultPositionEngine), engine)
-        self.assertIsInstance(container.resolve(PositionManager), DefaultPositionManager)
+        self.assertIsInstance(
+            container.resolve(PositionManager), DefaultPositionManager
+        )
 
 
 if __name__ == "__main__":

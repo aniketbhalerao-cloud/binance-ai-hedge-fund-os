@@ -137,24 +137,49 @@ class FakeLogger:
     def _record(self, level: str, message: str, extra: dict[str, Any] | None) -> None:
         self.records.append((level, message, dict(extra or {})))
 
-    def debug(self, message: str, *args: Any, extra: dict[str, Any] | None = None,
-              **kwargs: Any) -> None:
+    def debug(
+        self,
+        message: str,
+        *args: Any,
+        extra: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._record("DEBUG", message, extra)
 
-    def info(self, message: str, *args: Any, extra: dict[str, Any] | None = None,
-             **kwargs: Any) -> None:
+    def info(
+        self,
+        message: str,
+        *args: Any,
+        extra: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._record("INFO", message, extra)
 
-    def warning(self, message: str, *args: Any, extra: dict[str, Any] | None = None,
-                **kwargs: Any) -> None:
+    def warning(
+        self,
+        message: str,
+        *args: Any,
+        extra: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._record("WARNING", message, extra)
 
-    def error(self, message: str, *args: Any, extra: dict[str, Any] | None = None,
-              **kwargs: Any) -> None:
+    def error(
+        self,
+        message: str,
+        *args: Any,
+        extra: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._record("ERROR", message, extra)
 
-    def critical(self, message: str, *args: Any, extra: dict[str, Any] | None = None,
-                 **kwargs: Any) -> None:
+    def critical(
+        self,
+        message: str,
+        *args: Any,
+        extra: dict[str, Any] | None = None,
+        **kwargs: Any,
+    ) -> None:
         self._record("CRITICAL", message, extra)
 
     def messages(self) -> list[str]:

@@ -44,10 +44,15 @@ class BinanceRequestTranslator:
         order = request.execution_request.order_request
         binance_type = _TYPE[order.order_type]
         # Binance requires timeInForce only for limit-style orders.
-        tif = _TIF[order.time_in_force] if binance_type in {
-            BinanceOrderType.LIMIT,
-            BinanceOrderType.STOP_LOSS_LIMIT,
-        } else None
+        tif = (
+            _TIF[order.time_in_force]
+            if binance_type
+            in {
+                BinanceOrderType.LIMIT,
+                BinanceOrderType.STOP_LOSS_LIMIT,
+            }
+            else None
+        )
         return BinanceOrderRequest(
             symbol=order.symbol,
             side=_SIDE[order.side],

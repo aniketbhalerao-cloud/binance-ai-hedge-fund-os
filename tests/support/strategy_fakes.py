@@ -10,10 +10,10 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 
+from market_data.models import MarketSnapshot
 from strategies.base import BaseStrategy, StrategyMetadata
 from strategies.context import StrategyContext
 from strategies.signals import SignalDirection, TradingSignal
-from market_data.models import MarketSnapshot
 
 __all__ = [
     "FakeStrategy",
@@ -77,9 +77,7 @@ class BuyStrategy(BaseStrategy):
         return [self.make_signal(symbol=context.symbol, direction=SignalDirection.BUY)]
 
 
-def make_context(
-    *, exchange: str = "sim", symbol: str = "BTCUSDT"
-) -> StrategyContext:
+def make_context(*, exchange: str = "sim", symbol: str = "BTCUSDT") -> StrategyContext:
     """Build a deterministic StrategyContext with a market snapshot."""
     snapshot = MarketSnapshot(
         exchange=exchange,

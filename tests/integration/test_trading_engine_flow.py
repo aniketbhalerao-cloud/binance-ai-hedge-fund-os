@@ -14,6 +14,7 @@ from core.logging import LoggerFactory
 from database.registration import register_persistence
 from database.service import PersistenceService
 from events.bus import EventBus
+from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 from trading import (
     EngineStarted,
     EngineStopped,
@@ -21,7 +22,6 @@ from trading import (
     TradingEngine,
     register_trading_engine,
 )
-from tests.support.fakes import FakeLoggerFactory, FakeSubscriber
 
 
 class TradingEngineIntegrationTests(unittest.IsolatedAsyncioTestCase):

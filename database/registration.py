@@ -29,9 +29,7 @@ if TYPE_CHECKING:
 __all__ = ["register_persistence"]
 
 
-def register_persistence(
-    container: Container, *, enable_logging: bool = False
-) -> None:
+def register_persistence(container: Container, *, enable_logging: bool = False) -> None:
     """Register repositories and the persistence service with ``container``.
 
     Each repository interface is bound to its in-memory implementation as a
