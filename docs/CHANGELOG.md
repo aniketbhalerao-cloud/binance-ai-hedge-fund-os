@@ -196,3 +196,21 @@ Do not modify source code.
 - No WebSocket implementation
 - No REST API implementation
 - Replay-ready architecture
+## Sprint 2 – Task 13
+
+### Added
+- Generic Strategy Framework
+- BaseStrategy abstraction
+- StrategyContext
+- TradingSignal models
+- Strategy Registry
+- Strategy Factory
+- Strategy Manager
+- Strategy Events
+- Dependency Injection integration
+- Unit tests
+- Integration tests
+
+### Notes
+- No concrete trading strategies implemented.
+- Framework prepared for future RSI, EMA, MACD, AI, and custom strategies.
