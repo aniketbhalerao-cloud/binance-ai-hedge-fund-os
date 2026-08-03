@@ -703,26 +703,170 @@ The framework intentionally does not implement:
 - Advanced trade analytics
 
 These capabilities will be added in future releases.
-Update docs/CHANGELOG.md.
 
-Add a new entry for:
+# Sprint 3 – Task 22 – Performance Analytics Framework
 
-Version: v3.6 – Performance Analytics Framework
+## Added
 
-Follow the exact style and formatting used by the previous framework entries (v3.3, v3.4, v3.5).
+### Performance Analytics Framework
 
-Summarize:
-- Performance Analytics Framework
+Implemented an exchange-independent, read-only Performance Analytics Framework responsible for analyzing completed trading activity and producing standardized performance metrics across the entire system.
+
+### Components
+
+- Performance Engine
+- Performance Manager
 - Returns Calculator
 - Risk Calculator
 - Statistics Calculator
 - Benchmarking Service
 - Performance Registry
-- Event-driven integration
-- Dependency Injection
-- Thread safety
-- Test coverage (283 passing)
+- Performance Models
+- Performance Events
+- Performance Exceptions
 
-Do not modify anything else.
+### Features
+
+- Returns analytics
+- Risk analytics
+- Trading statistics
+- Benchmark comparison
+- Performance snapshots
+- Snapshot registration
+- Thread-safe analysis
+- Event Bus integration
+- Dependency Injection
+
+### Architecture
+
+- Exchange-independent design
+- Read-only analysis boundary
+- Consumes standardized PortfolioResult, PositionResult, TradeResult, and ExecutionResult
+- Stateless returns calculator
+- Stateless risk calculator
+- Stateless statistics calculator
+- Stateless benchmarking service
+- Atomic analysis execution
+- Thread-safe performance registry
+- Immutable performance models
+- Structured logging with LoggerFactory
+
+### Documentation
+
+Added:
+
+- ADR-015 – Performance Analytics Framework
+- Task 22 Prompt
+- Task 22 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Performance Components
+
+Current test suite:
+
+**283 Passing Tests**
+
+### Notes
+
+The framework intentionally does not implement:
+
+- Portfolio analytics dashboards
+- Historical performance tracking
+- Benchmark expansion
+- Performance reporting
+- Trade attribution
+- Risk-adjusted performance reporting
+- Compliance reporting
+
+These capabilities will be added in future releases.
+
+# Sprint 4 – Task 23 – Backtesting Framework
+
+## Added
+
+### Backtesting Framework
+
+Implemented a standalone, exchange-independent Backtesting Framework that replays historical market data through the existing processing spine to evaluate strategies, without modifying any previous framework.
+
+### Components
+
+- Backtesting Engine
+- Backtesting Manager
+- Scheduler
+- Simulator
+- Metrics
+- History
+- Registry
+- Backtesting Models
+- Backtesting Events
+- Backtesting Exceptions
+
+### Features
+
+- Historical timeline scheduling
+- Replay speed control
+- Post-Execution fill simulation
+- Simulated slippage
+- Simulated commission
+- Simulated latency
+- Backtest metrics
+- Append-only history
+- Snapshot registration
+- Thread-safe runs
+- Event Bus integration
+- Dependency Injection
+
+### Architecture
+
+- Exchange-independent design
+- Reuses the existing frameworks through Dependency Injection
+- Simulator restricted to post-Execution fills
+- No duplication of Execution or Exchange Adapter responsibilities
+- Stateless scheduler
+- Stateless simulator
+- Stateless metrics calculator
+- Atomic snapshot registration
+- Thread-safe backtest registry
+- Immutable backtest models
+- Structured logging with LoggerFactory
+
+### Documentation
+
+Added:
+
+- ADR-016 – Backtesting Framework
+- Task 23 Prompt
+- Task 23 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Backtesting Components
+
+Current test suite:
+
+**310 Passing Tests**
+
+### Notes
+
+The framework intentionally does not implement:
+
+- Walk-forward analysis
+- Multi-symbol and portfolio backtests
+- Parameter sweeps and optimization
+- Alternative fill and slippage models
+- Monte Carlo simulation
+- Advanced reporting
+- Integration with the AI Decision Engine
+
+These capabilities will be added in future releases.
 
 Only update CHANGELOG.md.
