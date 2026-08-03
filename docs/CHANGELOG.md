@@ -703,3 +703,26 @@ The framework intentionally does not implement:
 - Advanced trade analytics
 
 These capabilities will be added in future releases.
+Update docs/CHANGELOG.md.
+
+Add a new entry for:
+
+Version: v3.6 – Performance Analytics Framework
+
+Follow the exact style and formatting used by the previous framework entries (v3.3, v3.4, v3.5).
+
+Summarize:
+- Performance Analytics Framework
+- Returns Calculator
+- Risk Calculator
+- Statistics Calculator
+- Benchmarking Service
+- Performance Registry
+- Event-driven integration
+- Dependency Injection
+- Thread safety
+- Test coverage (283 passing)
+
+Do not modify anything else.
+
+Only update CHANGELOG.md.
