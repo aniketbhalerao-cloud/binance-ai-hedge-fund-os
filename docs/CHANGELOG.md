@@ -956,3 +956,95 @@ The framework intentionally does not implement:
 - Integration with the AI Decision Engine
 
 These capabilities will be added in future releases.
+
+# Sprint 5 – Task 25 – AI Decision Engine
+
+## Added
+
+### AI Decision Engine
+
+Implemented a standalone, exchange-independent and AI-provider-independent AI Decision Engine that coordinates autonomous agents to reason over the existing standardized results and produce a single immutable trading decision, without modifying any previous framework and without making any real LLM, model, or network call.
+
+### Components
+
+- Decision Engine
+- Decision Manager
+- Market Agent
+- Strategy Agent
+- Risk Agent
+- Portfolio Agent
+- CEO Agent
+- Consensus
+- Decision Metrics
+- Decision History
+- Agent Registry
+- Decision Models
+- Decision Events
+- Decision Exceptions
+
+### Features
+
+- Agent orchestration
+- Market analysis
+- Strategy analysis
+- Risk analysis
+- Portfolio analysis
+- CEO arbitration
+- Consensus resolution
+- Confidence and role weighting
+- Risk veto
+- Decision metrics
+- Append-only decision history
+- Agent registration by role
+- Thread-safe atomic decisions
+- Event Bus integration
+- Dependency Injection
+
+### Architecture
+
+- Exchange-independent design
+- AI-provider-independent design
+- No real LLM, model, or network calls
+- Deterministic agent abstractions
+- Reuses the existing frameworks through standardized results
+- CEO arbitration over analyst opinions
+- Stateless agents
+- Stateless consensus resolver
+- Stateless metrics calculator
+- Thread-safe agent registry
+- Atomic decision processing
+- Immutable decision models
+- Structured logging with LoggerFactory
+
+### Documentation
+
+Added:
+
+- ADR-018 – AI Decision Engine
+- Task 25 Prompt
+- Task 25 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Agent Components
+
+Current test suite:
+
+**368 Passing Tests**
+
+### Notes
+
+The framework intentionally does not implement:
+
+- Model-backed agents
+- Additional agent roles
+- Ensemble reasoning
+- Learning and feedback loop
+- Decision persistence and replay
+- Advanced reporting
+
+These capabilities will be added in future releases.
