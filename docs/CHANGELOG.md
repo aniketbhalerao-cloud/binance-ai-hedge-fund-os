@@ -1048,3 +1048,91 @@ The framework intentionally does not implement:
 - Advanced reporting
 
 These capabilities will be added in future releases.
+
+# Sprint 6 – Task 26 – Learning Framework
+
+## Added
+
+### Learning Framework
+
+Implemented a standalone, exchange-independent Learning Framework that enables continuous improvement by learning from completed trading activity, without modifying any previous framework. It consumes DecisionResult, TradeResult, and PerformanceResult, records them in an append-only journal, evaluates strategy and agent performance, and produces deterministic feedback. It performs no real model training, makes no network or API calls, and uses no external machine-learning libraries.
+
+### Components
+
+- Learning Engine
+- Learning Manager
+- Learning Journal
+- Evaluator
+- Feedback Generator
+- Learning Metrics
+- Learning Registry
+- Learning Models
+- Learning Events
+- Learning Exceptions
+
+### Features
+
+- Outcome recording
+- Append-only journal
+- Strategy evaluation
+- Agent evaluation
+- Model benchmarking
+- Scoring
+- Deterministic feedback generation
+- Weight and confidence recommendations
+- Learning metrics
+- Registry-owned learning records
+- Thread-safe atomic processing
+- Event Bus integration
+- Dependency Injection
+
+### Architecture
+
+- Exchange-independent design
+- Consumes DecisionResult, TradeResult, and PerformanceResult
+- Produces deterministic feedback
+- No real model training
+- No network or API calls
+- No external machine-learning libraries
+- Reuses the existing frameworks through standardized results
+- Registry-owned running learning record
+- Atomic per-outcome processing
+- Stateless evaluator
+- Stateless feedback generator
+- Stateless metrics calculator
+- Thread-safe learning registry
+- Immutable learning models
+- Structured logging with LoggerFactory
+
+### Documentation
+
+Added:
+
+- ADR-019 – Learning Framework
+- Task 26 Prompt
+- Task 26 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Learning Components
+
+Current test suite:
+
+**394 Passing Tests**
+
+### Notes
+
+The framework intentionally does not implement:
+
+- Applying learned weights back into strategies and agents
+- Additional evaluation dimensions
+- Alternative feedback policies
+- Prompt optimisation
+- Record persistence and replay
+- Advanced reporting
+
+These capabilities will be added in future releases.
