@@ -869,4 +869,90 @@ The framework intentionally does not implement:
 
 These capabilities will be added in future releases.
 
-Only update CHANGELOG.md.
+# Sprint 4 – Task 24 – Paper Trading Framework
+
+## Added
+
+### Paper Trading Framework
+
+Implemented a standalone, exchange-independent Paper Trading Framework that consumes live market data and drives it through the existing processing spine to simulate live trading in real time, without modifying any previous framework and without ever placing a real order.
+
+### Components
+
+- Paper Trading Engine
+- Paper Trading Manager
+- Feed
+- Paper Broker
+- Metrics
+- History
+- Registry
+- Paper Trading Models
+- Paper Trading Events
+- Paper Trading Exceptions
+
+### Features
+
+- Live market data consumption
+- Live market update normalization
+- Live trading simulation
+- Post-Execution fill simulation
+- Simulated slippage
+- Simulated commission
+- Simulated latency
+- Registry-owned session management
+- Session metrics
+- Append-only history
+- Snapshot registration
+- Thread-safe per-update processing
+- Event Bus integration
+- Dependency Injection
+
+### Architecture
+
+- Exchange-independent design
+- No real orders placed
+- Reuses the existing frameworks through Dependency Injection
+- Paper Broker restricted to post-Execution fills
+- No duplication of Execution or Exchange Adapter responsibilities
+- Registry-owned running session
+- Atomic per-update processing
+- Stateless feed
+- Stateless broker
+- Stateless metrics calculator
+- Thread-safe session registry
+- Immutable session and models
+- Structured logging with LoggerFactory
+
+### Documentation
+
+Added:
+
+- ADR-017 – Paper Trading Framework
+- Task 24 Prompt
+- Task 24 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Paper Trading Components
+
+Current test suite:
+
+**336 Passing Tests**
+
+### Notes
+
+The framework intentionally does not implement:
+
+- Live event-bus market feeds
+- Multi-symbol and portfolio sessions
+- Alternative fill and slippage models
+- Live monitoring and dashboards
+- Session persistence and resumption
+- Advanced reporting
+- Integration with the AI Decision Engine
+
+These capabilities will be added in future releases.
