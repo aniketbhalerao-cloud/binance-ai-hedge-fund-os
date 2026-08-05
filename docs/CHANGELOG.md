@@ -1136,3 +1136,91 @@ The framework intentionally does not implement:
 - Advanced reporting
 
 These capabilities will be added in future releases.
+
+# Sprint 7 – Task 27 – Optimization Framework
+
+## Added
+
+### Optimization Framework
+
+Implemented a standalone, exchange-independent Optimization Framework that consumes Learning Framework outputs and produces deterministic optimization plans and recommendations, without modifying any previous framework. It consumes strategy evaluations, agent evaluations, feedback, and learning metrics, ranks optimization targets, resolves a plan, and generates recommendations. It only proposes: it never applies a recommendation, never modifies strategies, agent weights, or portfolios, never trains a model, and makes no network, API, or AI-provider calls.
+
+### Components
+
+- Optimization Engine
+- Optimization Manager
+- Planner
+- Optimizer
+- Recommendations
+- Metrics
+- Registry
+- Optimization Models
+- Optimization Events
+- Optimization Exceptions
+
+### Features
+
+- Optimization target derivation
+- Underperforming-subject ranking
+- Optimization planning
+- Plan resolution
+- Deterministic recommendation generation
+- Proposed weight and confidence changes
+- Optimization metrics
+- Registry-owned optimization records
+- Thread-safe atomic processing
+- Event Bus integration
+- Dependency Injection
+
+### Architecture
+
+- Exchange-independent design
+- Consumes Learning Framework outputs
+- Produces deterministic optimization plans
+- Recommendations only; never applies changes
+- Never modifies strategies, agents, or portfolios automatically
+- No model training
+- No network, API, or AI-provider calls
+- Reuses the existing frameworks through standardized results
+- Registry-owned running optimization record
+- Atomic per-input processing
+- Stateless planner
+- Stateless optimizer
+- Stateless recommendation generator
+- Stateless metrics calculator
+- Thread-safe optimization registry
+- Immutable optimization models
+- Structured logging with LoggerFactory
+
+### Documentation
+
+Added:
+
+- ADR-020 – Optimization Framework
+- Task 27 Prompt
+- Task 27 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Optimization Components
+
+Current test suite:
+
+**416 Passing Tests**
+
+### Notes
+
+The framework intentionally does not implement:
+
+- An opt-in recommendation applier
+- Additional optimization objectives
+- Alternative planning and scoring policies
+- Multi-objective optimization
+- Record persistence and replay
+- Advanced reporting
+
+These capabilities will be added in future releases.
