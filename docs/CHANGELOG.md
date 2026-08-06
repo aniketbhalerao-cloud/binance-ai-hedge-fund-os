@@ -1312,3 +1312,91 @@ The framework intentionally does not implement:
 - Advanced reporting
 
 These capabilities will be added in future releases.
+
+# Sprint 9 – Task 29 – Dashboard Framework
+
+## Added
+
+### Dashboard Framework
+
+Implemented a standalone, exchange-independent Dashboard Framework that presents the state of the running system and produces deterministic dashboard views and widgets, without modifying any previous framework. It consumes strategy sources, performance sources, optimization sources, and monitoring sources, aggregates and composes them into panels, and generates widgets. It only presents: it never renders to a real display, never modifies strategies, agent weights, or portfolios, never trains a model, and makes no network, API, or AI-provider calls.
+
+### Components
+
+- Dashboard Engine
+- Dashboard Manager
+- Aggregator
+- Composer
+- Widgets
+- Metrics
+- Registry
+- Dashboard Models
+- Dashboard Events
+- Dashboard Exceptions
+
+### Features
+
+- View aggregation
+- Panel source normalization
+- View composition
+- Panel visibility resolution
+- Deterministic widget generation
+- Section arrangement
+- Dashboard metrics
+- Registry-owned dashboard records
+- Thread-safe atomic processing
+- Event Bus integration
+- Dependency Injection
+
+### Architecture
+
+- Exchange-independent design
+- Consumes standardized system outputs
+- Produces deterministic dashboard views
+- Widgets only; never acts on panels
+- Never modifies strategies, agents, or portfolios automatically
+- No model training
+- No network, API, or AI-provider calls
+- Reuses the existing frameworks through standardized results
+- Registry-owned running dashboard record
+- Atomic per-input processing
+- Stateless aggregator
+- Stateless composer
+- Stateless widget generator
+- Stateless metrics calculator
+- Thread-safe dashboard registry
+- Immutable dashboard models
+- Structured logging with LoggerFactory
+
+### Documentation
+
+Added:
+
+- ADR-022 – Dashboard Framework
+- Task 29 Prompt
+- Task 29 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Dashboard Components
+
+Current test suite:
+
+**458 Passing Tests**
+
+### Notes
+
+The framework intentionally does not implement:
+
+- An opt-in widget renderer
+- Additional panel types
+- Alternative composition and layout policies
+- Real-time streaming
+- Record persistence and replay
+- Advanced reporting
+
+These capabilities will be added in future releases.
