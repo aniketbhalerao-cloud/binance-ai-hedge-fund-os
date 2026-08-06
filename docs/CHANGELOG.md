@@ -1224,3 +1224,91 @@ The framework intentionally does not implement:
 - Advanced reporting
 
 These capabilities will be added in future releases.
+
+# Sprint 8 – Task 28 – Monitoring Framework
+
+## Added
+
+### Monitoring Framework
+
+Implemented a standalone, exchange-independent Monitoring Framework that observes the health of the running system and produces deterministic health reports and alerts, without modifying any previous framework. It consumes strategy signals, agent signals, performance metrics, and optimization signals, evaluates component and system health, detects threshold breaches, and generates alerts. It only observes: it never sends a notification, never modifies strategies, agent weights, or portfolios, never trains a model, and makes no network, API, or AI-provider calls.
+
+### Components
+
+- Monitoring Engine
+- Monitoring Manager
+- Health
+- Diagnostics
+- Alerts
+- Metrics
+- Registry
+- Monitoring Models
+- Monitoring Events
+- Monitoring Exceptions
+
+### Features
+
+- Health signal collection
+- Component observation normalization
+- Health diagnostics
+- Threshold-breach detection
+- Deterministic alert generation
+- Severity classification
+- Monitoring metrics
+- Registry-owned monitoring records
+- Thread-safe atomic processing
+- Event Bus integration
+- Dependency Injection
+
+### Architecture
+
+- Exchange-independent design
+- Consumes standardized system signals
+- Produces deterministic health reports
+- Alerts only; never acts on breaches
+- Never modifies strategies, agents, or portfolios automatically
+- No model training
+- No network, API, or AI-provider calls
+- Reuses the existing frameworks through standardized results
+- Registry-owned running monitoring record
+- Atomic per-input processing
+- Stateless health collector
+- Stateless diagnostics
+- Stateless alert generator
+- Stateless metrics calculator
+- Thread-safe monitoring registry
+- Immutable monitoring models
+- Structured logging with LoggerFactory
+
+### Documentation
+
+Added:
+
+- ADR-021 – Monitoring Framework
+- Task 28 Prompt
+- Task 28 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Monitoring Components
+
+Current test suite:
+
+**437 Passing Tests**
+
+### Notes
+
+The framework intentionally does not implement:
+
+- An opt-in notification dispatcher
+- Additional health indicators
+- Alternative diagnostics and severity policies
+- Anomaly detection
+- Record persistence and replay
+- Advanced reporting
+
+These capabilities will be added in future releases.
