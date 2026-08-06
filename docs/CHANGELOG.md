@@ -1400,3 +1400,91 @@ The framework intentionally does not implement:
 - Advanced reporting
 
 These capabilities will be added in future releases.
+
+# Sprint 10 – Task 30 – Notification Framework
+
+## Added
+
+### Notification Framework
+
+Implemented a standalone, exchange-independent Notification Framework that requests delivery of the running system's outputs and produces deterministic notification requests, without modifying any previous framework. It consumes monitoring sources, dashboard sources, optimization sources, and learning sources, collects and formats them into notifications, and generates requests. It only requests: it never sends a real notification, never modifies strategies, agent weights, or portfolios, never trains a model, and makes no network, API, or AI-provider calls.
+
+### Components
+
+- Notification Engine
+- Notification Manager
+- Collector
+- Formatter
+- Dispatcher
+- Metrics
+- Registry
+- Notification Models
+- Notification Events
+- Notification Exceptions
+
+### Features
+
+- Notification collection
+- Notification source normalization
+- Notification formatting
+- Delivery eligibility resolution
+- Deterministic request generation
+- Channel routing
+- Notification metrics
+- Registry-owned notification records
+- Thread-safe atomic processing
+- Event Bus integration
+- Dependency Injection
+
+### Architecture
+
+- Exchange-independent design
+- Consumes standardized system outputs
+- Produces deterministic notification requests
+- Requests only; never sends notifications
+- Never modifies strategies, agents, or portfolios automatically
+- No model training
+- No network, API, or AI-provider calls
+- Reuses the existing frameworks through standardized results
+- Registry-owned running notification record
+- Atomic per-input processing
+- Stateless collector
+- Stateless formatter
+- Stateless dispatcher
+- Stateless metrics calculator
+- Thread-safe notification registry
+- Immutable notification models
+- Structured logging with LoggerFactory
+
+### Documentation
+
+Added:
+
+- ADR-023 – Notification Framework
+- Task 30 Prompt
+- Task 30 Review
+
+### Testing
+
+Added:
+
+- Unit Tests
+- Integration Tests
+- Fake Notification Components
+
+Current test suite:
+
+**479 Passing Tests**
+
+### Notes
+
+The framework intentionally does not implement:
+
+- An opt-in delivery sender
+- Additional channels
+- Alternative formatting and routing policies
+- Rate limiting
+- Record persistence and replay
+- Advanced reporting
+
+These capabilities will be added in future releases.
