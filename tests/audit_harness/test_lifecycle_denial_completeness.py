@@ -39,12 +39,27 @@ from audit_harness.trace import run_trace
 #: baseline. A future *intentional* lifecycle change (new engine, new
 #: lifecycle method name, framework removed) must update this set
 #: deliberately, in the same change, with review.
+#:
+#: 33 -> 34 (Task 38.7 lifecycle-selection repair, reviewed): Category
+#: A's broadened source-walking plus call-site specialization keying
+#: made the walker reach `dotenv.parser.Position` (a real, third-party
+#: class discovered via a genuine call chain, not a name guess), whose
+#: own `@classmethod start()` is a real, callable method --
+#: `discover_lifecycle_targets`'s selection rule (name owned by the
+#: class + `callable(getattr(cls, name))`, no package/name allowlist)
+#: correctly includes it. The same pass also surfaced
+#: `builtins.range.start` as a same-shaped candidate under the old,
+#: name-only rule; that one is correctly *excluded* by the same rule,
+#: since `range.start` is a non-callable `member_descriptor` (a
+#: read-only data field), not a method -- reviewed and confirmed never
+#: to enter this baseline.
 EXPECTED_LIFECYCLE_TARGETS: frozenset[str] = frozenset(
     {
         "agents.engine.DefaultDecisionEngine.start",
         "backtesting.engine.DefaultBacktestEngine.start",
         "dashboard.composer.DefaultComposer.compose",
         "dashboard.engine.DefaultDashboardEngine.start",
+        "dotenv.parser.Position.start",
         "execution.engine.DefaultExecutionEngine.start",
         "learning.engine.DefaultLearningEngine.start",
         "market_data.service.MarketDataPipelineService.start",
@@ -116,10 +131,31 @@ def test_patched_lifecycle_set_equals_independently_derived_set() -> None:
     result = run_paper_only_denial_check(classes)
 
     patched_qualnames = frozenset(result.lifecycle_methods_patched)
+    assert len(EXPECTED_LIFECYCLE_TARGETS) == 34
     assert patched_qualnames == EXPECTED_LIFECYCLE_TARGETS, (
         f"missing={sorted(EXPECTED_LIFECYCLE_TARGETS - patched_qualnames)} "
         f"extra={sorted(patched_qualnames - EXPECTED_LIFECYCLE_TARGETS)}"
     )
+
+
+def test_lifecycle_selection_rule_excludes_noncallable_includes_callable() -> None:
+    """The reviewed rule (name owned by the class + actually callable,
+    no package/name allowlist) must exclude `builtins.range.start` (a
+    non-callable `member_descriptor`) and include
+    `dotenv.parser.Position.start` (a genuine callable `@classmethod`) --
+    the exact two candidates Task 38.7's broadened walking surfaced."""
+    from audit_harness.runtime_denial import discover_lifecycle_targets
+
+    trace = run_trace()
+    classes, _unimportable = _load_classes([n.qualname for n in trace.nodes])
+    candidate_qualnames = {t.qualname for t in discover_lifecycle_targets(classes)}
+
+    assert "builtins.range.start" not in candidate_qualnames
+    assert "dotenv.parser.Position.start" in candidate_qualnames
+    assert not callable(range.start)
+    import dotenv.parser as _dotenv_parser
+
+    assert callable(_dotenv_parser.Position.start)
 
 
 def test_every_wired_engine_class_is_present_in_the_node_collection() -> None:

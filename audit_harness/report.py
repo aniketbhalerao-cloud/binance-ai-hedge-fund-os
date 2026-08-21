@@ -21,7 +21,14 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-SCHEMA_VERSION = "38.6.0"
+#: 38.7.0 (Task 38.7): additive-only bump adding
+#: ``calls_unresolved_detail_multiplicity`` -- no existing field
+#: removed or renamed. Layer 2 of Task 38.7's Gate Outcome
+#: Requirements (``unimportable_nodes``) is closed via the preferred
+#: path (the ``mappingproxy`` qualname fix in ``audit_harness.identity``
+#: makes ``unimportable_nodes`` naturally empty), so ``all_clear``
+#: below is otherwise unchanged from schema 38.6.0.
+SCHEMA_VERSION = "38.7.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +91,9 @@ def build_report(
         "calls_total": calls_total,
         "calls_unresolved": calls_unresolved,
         "calls_unresolved_detail": trace["calls_unresolved_detail"],
+        "calls_unresolved_detail_multiplicity": trace[
+            "calls_unresolved_detail_multiplicity"
+        ],
         "identity_resolution_buckets": trace["identity_resolution_buckets"],
         "exact_identity_policy_version": trace["exact_identity_policy_version"],
         "module_state_candidates_total": module_state_total,

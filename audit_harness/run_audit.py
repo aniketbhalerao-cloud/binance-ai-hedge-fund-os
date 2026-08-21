@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib
 import subprocess
 import sys
+from collections import Counter
 from pathlib import Path
 
 from audit_harness import discovery, module_state, runtime_denial
@@ -77,10 +78,11 @@ def _load_classes(qualnames: list[str]) -> tuple[list[type], list[str]]:
     Returns ``(classes, unimportable)`` -- ``unimportable`` carries one
     fixed, generic entry per failure (``"<qualname>: import failed"``),
     never the raw exception text, a traceback, or a filesystem path. A
-    class this audit's own static walk already discovered failing to
-    import is itself worth recording (it happened once, for
-    ``builtins.mappingproxy`` -- not constructible via
-    ``importlib``), not silently dropped.
+    class this audit's own static walk discovers failing to import is
+    itself worth recording, not silently dropped (this was observed
+    once, for ``builtins.mappingproxy``, before Task 38.7's
+    ``module_and_qualname`` fix corrected that node's reported qualname
+    to the real, importable ``types.MappingProxyType``).
     """
     classes: list[type] = []
     unimportable: list[str] = []
@@ -121,6 +123,11 @@ def run_full_audit(repo_root: Path) -> Report:
     }
 
     tr = run_trace()
+    unresolved_detail_counts = Counter(
+        f"{c.site} :: {c.callee_text}"
+        for c in tr.calls
+        if c.verdict.category == "unresolved"
+    )
     trace_dict = {
         "roots_traced": tr.roots_traced,
         "roots_with_error": [list(e) for e in tr.roots_with_error],
@@ -130,12 +137,16 @@ def run_full_audit(repo_root: Path) -> Report:
         "nodes_unresolved_detail": [n.qualname for n in tr.nodes if n.unresolved],
         "calls_total": len(tr.calls),
         "calls_unresolved": tr.calls_unresolved,
-        "calls_unresolved_detail": sorted(
-            {
-                f"{c.site} :: {c.callee_text}"
-                for c in tr.calls
-                if c.verdict.category == "unresolved"
-            }
+        "calls_unresolved_detail": sorted(unresolved_detail_counts),
+        # Task 38.7 Requirement: the raw `calls_unresolved` count and the
+        # deduplicated `calls_unresolved_detail` list differ by design --
+        # several call sites are reached and recorded more than once by
+        # the walker's fixed-point traversal. This field makes that
+        # reconciliation a directly checkable invariant on the JSON
+        # output itself: sum(calls_unresolved_detail_multiplicity.values())
+        # == calls_unresolved, always.
+        "calls_unresolved_detail_multiplicity": dict(
+            sorted(unresolved_detail_counts.items())
         ),
         "identity_resolution_buckets": {
             "project_source_available": sum(
@@ -157,8 +168,6 @@ def run_full_audit(repo_root: Path) -> Report:
     candidates, parse_errors = module_state.scan_scope(
         repo_root, _MODULE_STATE_PACKAGES
     )
-    from collections import Counter
-
     bucket_counts = Counter(c.classification for c in candidates)
     module_state_dict = {
         "candidates_total": len(candidates),

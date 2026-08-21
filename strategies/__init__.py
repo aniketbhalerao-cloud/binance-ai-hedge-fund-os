@@ -12,6 +12,8 @@ This module exposes the public API and the DI wiring helper.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from core.logging import LoggerFactory
 from events.bus import EventBus
 from strategies.base import BaseStrategy, StrategyMetadata
@@ -45,6 +47,9 @@ from strategies.interfaces import (
 from strategies.manager import StrategyExecutionManager
 from strategies.registry import InMemoryStrategyRegistry
 from strategies.signals import SignalDirection, SignalMetadata, TradingSignal
+
+if TYPE_CHECKING:
+    from core.interfaces import Container
 
 __all__ = [
     # signals & context
@@ -86,7 +91,7 @@ __all__ = [
 ]
 
 
-def register_strategies(container: object) -> None:
+def register_strategies(container: Container) -> None:
     """Register the Strategy Framework services into a DI container.
 
     Registers the registry, factory, and manager as singletons, bound to their
@@ -95,9 +100,7 @@ def register_strategies(container: object) -> None:
     only if already registered.
 
     Args:
-        container: The DI container (a ``core.container.ServiceContainer``). Typed
-            as ``object`` to avoid importing the concrete container at module
-            load; the factory requires its constructor-injection ``create()``.
+        container: The DI container (a ``core.container.ServiceContainer``).
     """
     from core.container import ServiceContainer
     from core.interfaces import Resolver

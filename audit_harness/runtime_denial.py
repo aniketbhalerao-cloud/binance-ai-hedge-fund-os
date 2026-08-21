@@ -121,13 +121,25 @@ def discover_lifecycle_targets(
 ) -> tuple[LifecycleMethodTarget, ...]:
     """Every ``LIFECYCLE_METHOD_NAMES`` method a class defines on itself
     (not inherited) -- enumerated from the unified node collection, not
-    hand-listed."""
+    hand-listed.
+
+    Two structural requirements, no package/class-name/semantic
+    allowlist: the name must be owned by the class itself (``name in
+    cls.__dict__``, not inherited), and the resolved attribute must
+    actually be callable (``callable(getattr(cls, name))``). The second
+    check is what excludes a non-method data descriptor that happens to
+    share a lifecycle name -- e.g. ``range.start`` is a plain
+    ``member_descriptor`` (the read-only ``start`` field of a ``range``
+    instance), not a method, and setting it (to patch it) fails at the
+    C level -- while still keeping any genuine method, own-package or
+    third-party alike (e.g. a real ``@classmethod start()`` on a
+    third-party class)."""
     out: list[LifecycleMethodTarget] = []
     for cls in classes:
         if not isinstance(cls, type):
             continue
         for name in LIFECYCLE_METHOD_NAMES:
-            if name in cls.__dict__:
+            if name in cls.__dict__ and callable(getattr(cls, name)):
                 out.append(
                     LifecycleMethodTarget(
                         f"{cls.__module__}.{cls.__qualname__}.{name}", cls, name
