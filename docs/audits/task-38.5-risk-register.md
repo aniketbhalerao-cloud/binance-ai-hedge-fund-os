@@ -269,7 +269,7 @@ Every finding from `docs/audits/task-38.5-structural-audit.md`, areas 1–7 (plu
 | Exploit/failure scenario | N/A — no behavioral difference; a future contributor relying on the looser `object` annotation for a genuinely different argument type would silently break `register_strategies`, but nothing currently does. |
 | Existing protection | None; not needed today given the annotation still accepts what is actually passed. |
 | Recommendation | A future task should tighten `strategies/__init__.py:89`'s annotation to `container: Container`, matching the other 23 registrars — closes this specific harness gap and brings the file in line with the rest of the codebase's own convention. Do not implement here. |
-| Disposition | Open |
+| Disposition | **Closed** — Task 38.7, Phase A commit `dcb1ebc6b7fd34e89979fd9adf8ed0d57bc8ac58`. `strategies/__init__.py:89` now reads `def register_strategies(container: Container) -> None:`, importing `core.interfaces.Container` under `TYPE_CHECKING`, matching the other 23 registrars exactly — a pure typing change, no behavior change (the runtime `assert isinstance(container, ServiceContainer)` already enforced the real contract). Confirmed closed by Phase B re-run evidence: `docs/audits/task-38.7-result.json` (hash `bdbe9cffd1b770140af150e2d66a6524e078f17a817f99bb5d1ec771a7731c0b`) shows all three previously-unresolved `registrar:strategies` calls (`container.has`, `.register_class`, `.register_singleton`) now resolve; `docs/audits/task-38.7-assurance-report.md` §8 records the citation. |
 
 ---
 
