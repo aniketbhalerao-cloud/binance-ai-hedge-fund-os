@@ -4,7 +4,7 @@ Builds ``Settings``/``BootstrapContext`` normally first (the permitted
 configuration/clock reads happen before any patching), then patches
 every named forbidden-operation surface to raise, then runs the real
 ``app.bootstrap.run_dry_run_bootstrap`` and confirms it still succeeds
-24/24 with every patch active.
+25/25 with every patch active.
 
 No module in this file ever completes a real network, database, Redis,
 or exchange connection, at any point, including during its own
@@ -168,10 +168,20 @@ class RuntimeDenialResult:
 
     @property
     def success(self) -> bool:
+        """The expected whole-system composition count is a deliberate,
+        hand-set baseline -- never derived from ``COMPONENT_REGISTRARS``,
+        ``KNOWN_COMPONENT_IDS``, manifest length, or this result's own
+        observed counts. The point is to fail loudly if the expected count
+        drifts unexpectedly; a real, reviewed change to the wired framework
+        count must update this literal deliberately, in the same change.
+
+        24 -> 25: Task 38.9A (H-2 remediation) intentionally wires
+        ``exchange_adapters`` into the dry-run composition root.
+        """
         return (
             self.bootstrap_status == "SUCCESS"
-            and self.preflight_total == 24
-            and self.preflight_passed == 24
+            and self.preflight_total == 25
+            and self.preflight_passed == 25
             and self.preflight_failed == 0
             and self.forbidden_call_observed is None
         )

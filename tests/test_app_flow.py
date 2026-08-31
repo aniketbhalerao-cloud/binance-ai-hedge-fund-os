@@ -7,6 +7,7 @@ anywhere.
 from __future__ import annotations
 
 import ast
+import contextlib
 import dataclasses
 import inspect
 import itertools
@@ -26,9 +27,18 @@ import app.preflight as preflight_module
 from app import bootstrap, preflight, wiring
 from app.models import BootstrapResultStatus
 from core.container import ServiceContainer
+from exchange_adapters import (
+    DefaultExchangeAuthentication,
+    DefaultExchangeConnection,
+    DefaultExchangeEngine,
+    DefaultExchangeManager,
+    DefaultExchangeRouter,
+    DefaultExchangeValidator,
+    register_exchange_adapters,
+)
 from tests.app_fakes import CANONICAL_UTC, make_component, make_context, make_manifest
 
-#: The 24 completed framework package names, plus ``trading`` (excluded
+#: The 25 completed framework package names, plus ``trading`` (excluded
 #: from ``COMPONENT_REGISTRARS`` but still off-limits to import directly).
 #: An executable ``import`` of any of these outside ``app/wiring.py`` (as
 #: opposed to a docstring *mention*) is a boundary violation.
@@ -144,7 +154,7 @@ class NoContainerParameterTests(unittest.TestCase):
 
 
 class EndToEndTests(unittest.TestCase):
-    def test_default_manifest_registers_all_24_into_the_candidate_container(
+    def test_default_manifest_registers_all_25_into_the_candidate_container(
         self,
     ) -> None:
         captured: list[ServiceContainer] = []
@@ -168,14 +178,14 @@ class EndToEndTests(unittest.TestCase):
 
         assert result.preflight_report is not None
         assert result.runtime_snapshot is not None
-        self.assertEqual(result.preflight_report.total_checks, 24)
-        self.assertEqual(result.preflight_report.passed_checks, 24)
+        self.assertEqual(result.preflight_report.total_checks, 25)
+        self.assertEqual(result.preflight_report.passed_checks, 25)
         self.assertEqual(result.preflight_report.failed_checks, 0)
         self.assertEqual(
             set(result.runtime_snapshot.registered_component_ids),
             wiring.KNOWN_COMPONENT_IDS,
         )
-        self.assertEqual(len(result.runtime_snapshot.registered_component_ids), 24)
+        self.assertEqual(len(result.runtime_snapshot.registered_component_ids), 25)
 
     def test_end_to_end_pipeline_produces_all_four_artifacts(self) -> None:
         manifest = make_manifest(
@@ -419,8 +429,8 @@ class MainEntrypointTests(unittest.TestCase):
         self.assertIsNotNone(now.tzinfo)
         self.assertEqual(now.utcoffset(), timedelta(0))
 
-    def test_default_manifest_resolves_24_of_24_and_exits_0(self) -> None:
-        """The real default composition: all 24 known components register
+    def test_default_manifest_resolves_25_of_25_and_exits_0(self) -> None:
+        """The real default composition: all 25 known components register
         and every declared service key resolves — no partial/failed
         preflight checks, matching ``docs/prompts/task-38.md``'s intent
         that a dry run prove the *whole* graph would wire."""
@@ -655,7 +665,7 @@ class DryRunMarketDataProviderStatelessnessTests(unittest.TestCase):
 
 
 class TwoIndependentDefaultRunsBothSucceedTests(unittest.TestCase):
-    def test_two_independent_default_runs_both_resolve_24_of_24(self) -> None:
+    def test_two_independent_default_runs_both_resolve_25_of_25(self) -> None:
         for _ in range(2):
             context = make_context(manifest=wiring.build_default_manifest())
             result = bootstrap.run_dry_run_bootstrap(
@@ -665,12 +675,86 @@ class TwoIndependentDefaultRunsBothSucceedTests(unittest.TestCase):
             self.assertEqual(result.status, BootstrapResultStatus.SUCCESS)
             assert result.preflight_report is not None
             assert result.runtime_snapshot is not None
-            self.assertEqual(result.preflight_report.total_checks, 24)
-            self.assertEqual(result.preflight_report.passed_checks, 24)
+            self.assertEqual(result.preflight_report.total_checks, 25)
+            self.assertEqual(result.preflight_report.passed_checks, 25)
             self.assertEqual(result.preflight_report.failed_checks, 0)
             self.assertEqual(
-                len(result.runtime_snapshot.registered_component_ids), 24
+                len(result.runtime_snapshot.registered_component_ids), 25
             )
+
+
+class H2ExchangeAdaptersRemediationTests(unittest.TestCase):
+    """Task 38.9A — H-2 (``docs/audits/task-38.5-risk-register.md``):
+    ``exchange_adapters`` is now a 25th ``COMPONENT_REGISTRARS`` entry.
+    These prove the remediation itself, independent of the renamed
+    24->25 assertions elsewhere in this module.
+    """
+
+    def test_exchange_adapters_is_a_component_registrar(self) -> None:
+        self.assertIn("exchange_adapters", wiring.COMPONENT_REGISTRARS)
+        self.assertIs(
+            wiring.COMPONENT_REGISTRARS["exchange_adapters"],
+            register_exchange_adapters,
+        )
+
+    def test_known_component_ids_is_exactly_25_and_includes_exchange_adapters(
+        self,
+    ) -> None:
+        self.assertEqual(len(wiring.KNOWN_COMPONENT_IDS), 25)
+        self.assertIn("exchange_adapters", wiring.KNOWN_COMPONENT_IDS)
+
+    def test_default_manifest_contains_exactly_one_exchange_adapters_component(
+        self,
+    ) -> None:
+        manifest = wiring.build_default_manifest()
+        matches = [
+            component
+            for component in manifest.components
+            if component.component_id == "exchange_adapters"
+        ]
+        self.assertEqual(len(matches), 1)
+
+    def test_exchange_adapters_declared_service_key_is_safe(self) -> None:
+        manifest = wiring.build_default_manifest()
+        component = next(
+            c for c in manifest.components if c.component_id == "exchange_adapters"
+        )
+        self.assertEqual(len(component.required_service_keys), 1)
+        key = component.required_service_keys[0]
+        self.assertIn(key, wiring.SAFE_SERVICE_KEYS)
+        self.assertIs(wiring.SAFE_SERVICE_KEYS[key], DefaultExchangeManager)
+
+    def test_resolving_exchange_manager_invokes_no_business_or_lifecycle_method(
+        self,
+    ) -> None:
+        """Registering and resolving ``exchange_adapters`` must never call
+        any ``async`` business/lifecycle method on any of its collaborators
+        — only their I/O-free ``__init__``. Patches every such method with a
+        spy that fails the test if called, then drives the same registration
+        + resolution path ``run_dry_run_bootstrap`` uses."""
+        container = ServiceContainer()
+        register_exchange_adapters(container)
+
+        watched = (
+            (DefaultExchangeAuthentication, "authenticate"),
+            (DefaultExchangeConnection, "open"),
+            (DefaultExchangeConnection, "close"),
+            (DefaultExchangeValidator, "validate"),
+            (DefaultExchangeRouter, "route"),
+            (DefaultExchangeManager, "process"),
+            (DefaultExchangeEngine, "start"),
+            (DefaultExchangeEngine, "stop"),
+            (DefaultExchangeEngine, "process"),
+        )
+        with contextlib.ExitStack() as stack:
+            mocks = [
+                stack.enter_context(patch.object(cls, name))
+                for cls, name in watched
+            ]
+            manager = container.resolve(DefaultExchangeManager)
+            self.assertIsInstance(manager, DefaultExchangeManager)
+            for mock in mocks:
+                mock.assert_not_called()
 
 
 if __name__ == "__main__":

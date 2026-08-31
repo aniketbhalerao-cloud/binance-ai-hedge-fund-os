@@ -53,6 +53,14 @@ from audit_harness.trace import run_trace
 #: since `range.start` is a non-callable `member_descriptor` (a
 #: read-only data field), not a method -- reviewed and confirmed never
 #: to enter this baseline.
+#:
+#: 34 -> 35 (Task 38.9A, H-2 remediation, reviewed): `exchange_adapters`
+#: is now the 25th `COMPONENT_REGISTRARS` entry, making
+#: `exchange_adapters.engine.DefaultExchangeEngine` -- registered
+#: alongside its manager, exactly like every other framework's engine --
+#: reachable for the first time. Its `start()` lifecycle method is
+#: discovered and patched by the same unchanged, name+callable rule as
+#: every other entry here; no discovery/patching logic changed.
 EXPECTED_LIFECYCLE_TARGETS: frozenset[str] = frozenset(
     {
         "agents.engine.DefaultDecisionEngine.start",
@@ -60,6 +68,7 @@ EXPECTED_LIFECYCLE_TARGETS: frozenset[str] = frozenset(
         "dashboard.composer.DefaultComposer.compose",
         "dashboard.engine.DefaultDashboardEngine.start",
         "dotenv.parser.Position.start",
+        "exchange_adapters.engine.DefaultExchangeEngine.start",
         "execution.engine.DefaultExecutionEngine.start",
         "learning.engine.DefaultLearningEngine.start",
         "market_data.service.MarketDataPipelineService.start",
@@ -92,15 +101,21 @@ EXPECTED_LIFECYCLE_TARGETS: frozenset[str] = frozenset(
     }
 )
 
-#: The 22 frameworks that register a `*.engine.*` class (the other two
+#: The 23 frameworks that register a `*.engine.*` class (the other two
 #: wired frameworks, market_data and strategies, use a differently
 #: named Service/Manager pattern, not "Engine", and are intentionally
 #: absent from this list). Same non-circularity rationale as above.
+#:
+#: 22 -> 23 (Task 38.9A, H-2 remediation, reviewed): `exchange_adapters`
+#: registers `DefaultExchangeEngine` alongside its manager, exactly like
+#: every other framework's engine -- now reachable per the same
+#: unchanged discovery rule.
 EXPECTED_ENGINE_NODES: frozenset[str] = frozenset(
     {
         "agents.engine.DefaultDecisionEngine",
         "backtesting.engine.DefaultBacktestEngine",
         "dashboard.engine.DefaultDashboardEngine",
+        "exchange_adapters.engine.DefaultExchangeEngine",
         "execution.engine.DefaultExecutionEngine",
         "learning.engine.DefaultLearningEngine",
         "memory.engine.DefaultMemoryEngine",
@@ -131,7 +146,7 @@ def test_patched_lifecycle_set_equals_independently_derived_set() -> None:
     result = run_paper_only_denial_check(classes)
 
     patched_qualnames = frozenset(result.lifecycle_methods_patched)
-    assert len(EXPECTED_LIFECYCLE_TARGETS) == 34
+    assert len(EXPECTED_LIFECYCLE_TARGETS) == 35
     assert patched_qualnames == EXPECTED_LIFECYCLE_TARGETS, (
         f"missing={sorted(EXPECTED_LIFECYCLE_TARGETS - patched_qualnames)} "
         f"extra={sorted(patched_qualnames - EXPECTED_LIFECYCLE_TARGETS)}"
@@ -159,7 +174,7 @@ def test_lifecycle_selection_rule_excludes_noncallable_includes_callable() -> No
 
 
 def test_every_wired_engine_class_is_present_in_the_node_collection() -> None:
-    """Regression guard for the specific root cause: every one of the 22
+    """Regression guard for the specific root cause: every one of the 23
     frameworks that register a `*.engine.*` class must appear in the
     traced node collection, not just the ones some sibling framework
     happens to also resolve."""

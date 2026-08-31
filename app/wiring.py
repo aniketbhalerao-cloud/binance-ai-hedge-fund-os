@@ -39,6 +39,7 @@ from app.exceptions import ConfigurationError
 from app.models import ComponentManifest, ComponentSpec, ConfigurationView
 from backtesting import DefaultBacktestManager, register_backtesting
 from dashboard import DefaultDashboardManager, register_dashboard
+from exchange_adapters import DefaultExchangeManager, register_exchange_adapters
 from execution import DefaultExecutionManager, register_execution
 from learning import DefaultLearningManager, register_learning
 from market_data import MarketDataPipelineService, register_market_data
@@ -120,17 +121,21 @@ class _DryRunMarketDataProvider:
 _DRY_RUN_MARKET_DATA_PROVIDER = _DryRunMarketDataProvider()
 
 #: Every completed package exposing a ``register_<framework>`` function —
-#: all 24 of them. ``trading/`` has no ``register_trading`` function and is
+#: all 25 of them. ``trading/`` has no ``register_trading`` function and is
 #: deliberately excluded — there is nothing to wire. ``market_data`` is
 #: bound via ``functools.partial`` to the dry-run provider above, so
 #: ``market_data`` itself (and every framework that optionally resolves
 #: ``MarketDataService``) can complete preflight resolution without a real
-#: provider.
+#: provider. ``exchange_adapters`` registers the same way every other
+#: framework does (H-2, ``docs/audits/task-38.5-risk-register.md``) — its
+#: registrar declares no broker adapter, no credentials, and no connect/
+#: authenticate/route/submit call of its own (see ``_COMPONENT_SERVICE``).
 COMPONENT_REGISTRARS: Mapping[str, Callable[[Container], None]] = MappingProxyType(
     {
         "agents": register_agents,
         "backtesting": register_backtesting,
         "dashboard": register_dashboard,
+        "exchange_adapters": register_exchange_adapters,
         "execution": register_execution,
         "learning": register_learning,
         "market_data": functools.partial(
@@ -167,12 +172,22 @@ KNOWN_COMPONENT_IDS: frozenset[str] = frozenset(COMPONENT_REGISTRARS)
 #: Every listed type is a framework's ``Manager``/service abstraction, built
 #: only from already-registered, in-process collaborators — proven free of
 #: I/O in its constructor by that framework's own registrar (see the module
-#: docstring).
+#: docstring). ``exchange_adapters`` -> ``DefaultExchangeManager`` is chosen
+#: over ``DefaultExchangeEngine`` deliberately: the manager's constructor
+#: alone forces resolution of every one of the framework's own collaborators
+#: (``ExchangeAuthentication``, ``ExchangeConnection``, ``ExchangeValidator``,
+#: ``ExchangeRouter``, ``ExchangeRegistry``, ``EventBus``) — proving
+#: ``exchange_adapters``' own DI graph wires — without ever calling
+#: ``.authenticate()``/``.open()``/``.route()``/``.validate()``/``.submit()``/
+#: ``.process()`` (all `async def`, never invoked by construction). The
+#: engine would additionally, optionally reach into ``execution``/``trading``
+#: for no proof this framework's own registration needs.
 _COMPONENT_SERVICE: Mapping[str, tuple[str, type]] = MappingProxyType(
     {
         "agents": ("agents.manager", DefaultDecisionManager),
         "backtesting": ("backtesting.manager", DefaultBacktestManager),
         "dashboard": ("dashboard.manager", DefaultDashboardManager),
+        "exchange_adapters": ("exchange_adapters.manager", DefaultExchangeManager),
         "execution": ("execution.manager", DefaultExecutionManager),
         "learning": ("learning.manager", DefaultLearningManager),
         "market_data": ("market_data.service", MarketDataPipelineService),
