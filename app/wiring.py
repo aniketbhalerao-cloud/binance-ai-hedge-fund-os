@@ -1,11 +1,39 @@
-"""Composition-root wiring — the one sanctioned cross-framework import site.
+"""Composition-root wiring — the sanctioned site for registrar and
+concrete-implementation imports.
 
-Every prior framework is forbidden from importing another framework
-directly; that is the entire point of registering everything through
-``core.container``. This module is the single, documented exception: it is
-the only place in the codebase permitted to import each framework's
-``register_<framework>`` function. That permission is confined to this
-module — nowhere else in ``app/``, and nowhere outside ``app/``, gains it.
+``app/wiring.py`` is the composition-root site permitted to import every
+completed framework's ``register_<framework>`` function and, where dry-run
+resolution requires it, a framework's concrete ``Manager``/service
+implementation — the one place, in ``app/`` or anywhere else, that assembles
+the whole-system object graph.
+
+Framework packages themselves are **not** globally import-isolated.
+Existing frameworks legitimately share public domain/value types
+(``models``, ``context``, ``signals``, ``state``) and ``Protocol``
+interfaces directly with one another — a real, evidenced, intentional
+pattern (`docs/audits/task-38.5-risk-register.md` H-1; investigated in
+Task 38.9B, disposition still Open pending its own Phase B/C), not
+something this module's own permission is meant to prevent. A narrow
+existing exception additionally uses ``trading.engine.TradingEngine`` — a
+concrete class, not a ``Protocol`` — as an optional, ``resolver.has()``-
+gated DI lookup key in nine frameworks; proven, per reference, never
+instantiated directly and never invoked for a business/lifecycle operation
+by any of them (`tests/test_h1_cross_framework_boundary.py`).
+
+Framework registration and construction never directly construct another
+framework's concrete implementation — proven generally, for any
+cross-framework concrete import under any import spelling, by
+``tests/test_h1_cross_framework_boundary.py``. That same test additionally
+proves the one reviewed concrete collaborator above, specifically, is never
+invoked for a business/lifecycle operation (its own real
+``.start()``/``.stop()``/``.pause()``/``.resume()`` API) by any of its nine
+importers — this is not asserted as a general, every-cross-framework-pair
+guarantee, only as what is actually evidenced for that one collaborator.
+Construction of a concrete cross-framework collaborator happens only here,
+mediated by the DI container — that permission (importing each framework's
+``register_<framework>`` function to perform that construction) is confined
+to this module: nowhere else in ``app/``, and nowhere outside ``app/``,
+gains it.
 
 Holds exactly three things:
 
