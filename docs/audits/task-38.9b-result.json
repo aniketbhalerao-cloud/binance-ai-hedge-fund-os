@@ -1,0 +1,134 @@
+{
+  "schema_version": "38.9b.1",
+  "task": "Task 38.9B Phase B - H-1 cross-framework import reconciliation evidence",
+  "commit_sha": "78b5332197e03777b689794bdd9cbbd4b60e6e77",
+  "phase": "B",
+  "verdict": "PASS",
+  "methodology_note": "Corrected after independent evidence-methodology review (schema 38.9b.0 -> 38.9b.1). Import classification and concrete-import behavior are modeled as two separate dimensions rather than one forced six-bucket shape, since an import record and a later behavioral call on it are not naturally mutually exclusive categories of the same thing.",
+  "scan": {
+    "wired_frameworks": 25,
+    "packages_scanned": 26,
+    "raw_import_records": 203,
+    "importing_frameworks": [
+      "agents",
+      "backtesting",
+      "exchange_adapters",
+      "execution",
+      "learning",
+      "market_data",
+      "optimization",
+      "order_management",
+      "paper_trading",
+      "performance",
+      "portfolio",
+      "positions",
+      "risk",
+      "strategies",
+      "trades"
+    ],
+    "importing_frameworks_count": 15,
+    "import_classification": {
+      "runtime_domain_value": 125,
+      "runtime_protocol_interface": 31,
+      "runtime_concrete": 9,
+      "type_checking_only": 38
+    },
+    "import_classification_sum_check": 203,
+    "evidence_source": "fresh, independently regenerated scan (h1_phaseb_scan_v2.py), run twice, byte-identical"
+  },
+  "concrete_runtime": {
+    "types": ["trading.engine.TradingEngine"],
+    "types_count": 1,
+    "trading_engine_importers": [
+      "exchange_adapters",
+      "execution",
+      "market_data",
+      "order_management",
+      "portfolio",
+      "positions",
+      "risk",
+      "strategies",
+      "trades"
+    ],
+    "trading_engine_importers_count": 9,
+    "trading_engine_import_records": 9,
+    "behavior_analysis_of_the_9_concrete_records": {
+      "direct_instantiation": 0,
+      "di_key": 9,
+      "bare_reference_unclassified": 0,
+      "note": "bare_reference_unclassified is an explicit third bucket (not a fallback into di_key) for any concrete record whose local binding is neither directly constructed nor passed to resolver.has/resolve. It is 0 today; a future unsupported reference form would surface here rather than being silently classified as safe."
+    },
+    "resolver_has_references": 9,
+    "resolver_resolve_references": 9,
+    "permitted_runtime_references_total": 18,
+    "direct_instantiations": 0,
+    "other_runtime_references": 0,
+    "other_runtime_references_evidence_source": "tests/test_h1_cross_framework_boundary.py::test_trading_engine_runtime_uses_are_exactly_the_permitted_di_key_forms (committed test; enumerates every runtime Name/Attribute reference to the local TradingEngine binding, not just Call sites, and asserts each is a resolver.has/resolve argument). The fresh scratch scan's mechanical call-site counts (direct_construction=0, resolver_has=9, resolver_resolve=9) corroborate but are not themselves exhaustive over all reference forms.",
+    "evidence_source_direct_instantiations": "fresh scratch scan mechanical Call.func resolution (h1_phaseb_scan_v2.py), corroborated by tests/test_h1_cross_framework_boundary.py::test_no_framework_directly_instantiates_another_frameworks_concrete_class and ::test_the_one_evidenced_concrete_di_key_exception_is_exactly_scoped"
+  },
+  "lifecycle": {
+    "tracked_methods": ["start", "stop", "pause", "resume"],
+    "direct_calls": 0,
+    "evidence_source": "tests/test_h1_cross_framework_boundary.py::test_trading_engine_lifecycle_methods_are_never_invoked_by_its_importers (committed, receiver-aware/bound-attribute regression test)",
+    "scratch_scan_role": "The fresh scratch scan also ran a coarse, NON-receiver-aware name scan (any Call node named start/stop/pause/resume anywhere in a file that imports TradingEngine) purely as non-authoritative diagnostic corroboration; it found 0 hits, consistent with the committed test, but a name-based scan cannot prove the call's receiver is actually a TradingEngine instance and is not cited as evidence for this metric.",
+    "scope_note": "Scoped to the 9 evidenced trading.engine.TradingEngine importers only; not a repo-wide claim about business-method calls in general."
+  },
+  "controls": {
+    "construction_negative_controls_detected": 5,
+    "construction_negative_controls_total": 5,
+    "construction_negative_control_forms": [
+      "TradingEngine(...)",
+      "TE(...)",
+      "trading.engine.TradingEngine(...)",
+      "te.TradingEngine(...)",
+      "engine.TradingEngine(...)"
+    ],
+    "permitted_di_positive_control": "PASS",
+    "permitted_di_positive_control_forms": [
+      "resolver.has(TradingEngine)",
+      "resolver.resolve(TradingEngine)"
+    ],
+    "qualified_type_checking_control": "PASS",
+    "evidence_source": "committed detector tests/test_h1_cross_framework_boundary.py::find_direct_construction_violations invoked directly on synthetic snippets, plus the committed test suite itself (targeted run below)"
+  },
+  "verification": {
+    "targeted_tests": {
+      "command": ".venv/bin/python -m pytest tests/test_h1_cross_framework_boundary.py -v",
+      "result": "7 passed",
+      "tests": [
+        "test_no_framework_directly_instantiates_another_frameworks_concrete_class",
+        "test_the_one_evidenced_concrete_di_key_exception_is_exactly_scoped",
+        "test_trading_engine_runtime_uses_are_exactly_the_permitted_di_key_forms",
+        "test_trading_engine_lifecycle_methods_are_never_invoked_by_its_importers",
+        "test_negative_controls_construction_detected_under_every_import_spelling",
+        "test_positive_control_resolver_di_lookup_is_never_flagged",
+        "test_qualified_typing_type_checking_guard_is_also_recognized"
+      ]
+    },
+    "full_suite": {
+      "command": ".venv/bin/python -m pytest -q",
+      "result": "944 passed"
+    },
+    "ruff": {
+      "command": ".venv/bin/ruff check app/wiring.py tests/test_h1_cross_framework_boundary.py",
+      "result": "clean"
+    },
+    "mypy": {
+      "command": ".venv/bin/python -m mypy app/wiring.py tests/test_h1_cross_framework_boundary.py",
+      "result": "clean"
+    },
+    "diff_check": {
+      "command": "git diff --check",
+      "result": "clean"
+    },
+    "app_main_exit_code": 0,
+    "app_main_note": "Dry-run composition build only; no live network/DB/Redis/exchange operation. Does not itself re-verify or change the existing 25/25 H-2 composition evidence (Task 38.9A)."
+  },
+  "determinism": {
+    "identical": true,
+    "canonical_sha256": "6a016ffd51343663685a5f0735653ca64d5251f29479acddc214666a26b00fa1",
+    "note": "Corrected (v2) scan/classification script, run twice independently against the committed SHA; canonicalized as sort_keys/indent=2 JSON; both runs byte-identical. Supersedes the schema-38.9b.0 hash 08f0120028ecd2dbe896cbe8fda967071008af827e32877dcd276bb42a3c29ef, which was computed from a scan containing the Issue 1/3 methodology defects."
+  },
+  "classification_method_note": "AST import/call discovery is static. Concrete-vs-Protocol-vs-ABC-vs-dataclass-vs-Enum symbol classification uses runtime introspection (importlib.import_module + getattr + inspect/dataclasses/enum checks), not name-pattern heuristics. The test suite itself (tests/test_h1_cross_framework_boundary.py) is not purely static for the same reason.",
+  "scratch_artifact_note": "An earlier scratch debug dump (outside the repository) concatenated `records + concrete_records`, which are overlapping references to the same objects, producing duplicate rows in that debug file only. No permanent metric in this JSON was ever computed from that duplicated dump; all counts here come from the non-duplicated `import_buckets`/`behavior_totals` accumulators, incremented exactly once per unique record. The corrected (v2) scratch scan no longer produces the duplication."
+}
