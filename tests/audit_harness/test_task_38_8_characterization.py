@@ -1,16 +1,32 @@
-"""Task 38.8 Phase A.0: characterization tests for the implicit-
+"""Task 38.8: characterization/regression tests for the implicit-
 protocol-dispatch discovery gap (``docs/audits/task-38.5-risk-register.md``'s
 **M-8**).
 
-Each test proves the *current* behavior `docs/prompts/task-38.8.md` §3
-requires: walking a fixture's "trigger" function -- which exercises one
-protocol dispatch event through ordinary syntax, never a direct call to
-the dunder by name -- produces zero ``CallRecord`` referencing the
-sentinel embedded in that event's own dunder body. This is Phase A.0
-only: it documents M-8's own claim on committed source, exactly as it
-stands today. No mechanism is implemented here, and no test below
-asserts anything about *detecting* the sentinel -- only that it is
-currently invisible to ``StaticWalker``.
+Originally Phase A.0-only (proving the pre-mechanism gap existed for
+all 11 families named in `docs/prompts/task-38.8.md` §2). Phase A.1
+(ADR-032 Option D, 2026-08-24) implemented production detection for
+exactly 2 of those 11 families -- context managers and descriptors --
+so this file now serves two roles side by side, for the *same* 36
+independently isolated dispatch events, never collapsed into one:
+
+* For the **2 mechanized families** (context managers, descriptors):
+  this is now **regression protection**, not gap characterization --
+  each case positively proves the mechanism *detects* the sentinel
+  embedded in that dispatch event's own body, via identity
+  (``verdict.category``/``module``/``qualname``), never a path
+  substring or loose ``callee_text`` match.
+* For the **remaining 9 unsupported families**: this remains
+  unchanged **boundary characterization** -- each case still proves
+  walking the trigger produces zero ``CallRecord`` referencing the
+  embedded sentinel, exactly as it did before Phase A.1, proving the
+  documented boundary has not silently eroded.
+
+No case was deleted, skipped, or weakened to reach this state: the
+same 36 fixtures, the same sentinel-integrity proof machinery, and the
+same explicit case-count guard are all still here -- only the expected
+outcome for the 8 now-mechanized cases (4 context-manager events, 4
+descriptor events) was updated to match the production behavior this
+task's own implementation added.
 
 **Only the trigger functions and the sentinel-bearing dunder bodies are
 never executed.** Importing ``tests.audit_harness.fixtures.implicit_dispatch``
@@ -202,11 +218,21 @@ def _assert_family_characterized(
     trigger: Callable[..., object],
     site_label: str,
     sentinel_targets: Sequence[tuple[type, str]],
+    *,
+    expect_detected: bool,
 ) -> None:
     """Shared body for every dispatch-event test below -- one
     implementation, not one copy per test that could silently drift
     apart (the same discipline ``test_negative_controls.py`` already
-    holds itself to for its own shared ``run_self_tests()`` call)."""
+    holds itself to for its own shared ``run_self_tests()`` call).
+
+    ``expect_detected`` distinguishes the two roles this file now
+    plays for the same 36 cases: ``True`` for the 8 cases belonging to
+    the 2 families ADR-032 Option D mechanized (context managers,
+    descriptors) -- regression protection, proving the mechanism
+    positively detects the sentinel; ``False`` for the remaining 28
+    cases (the 9 still-unsupported families) -- unchanged boundary
+    characterization, proving the sentinel is still invisible."""
     for cls, attr_name in sentinel_targets:
         assert _dunder_calls_the_real_forbidden_sentinel(cls, attr_name), (
             f"fixture malformed: {cls.__qualname__}.{attr_name} does not "
@@ -222,11 +248,18 @@ def _assert_family_characterized(
         for r in walker.call_records
         if r.verdict.module == _OPEN_MODULE and r.verdict.qualname == _OPEN_QUALNAME
     ]
-    assert not forbidden_open_records, (
-        f"{site_label}: StaticWalker unexpectedly discovered the embedded "
-        f"sentinel via {trigger.__qualname__} -- M-8's own claim would be "
-        f"falsified by this run: {forbidden_open_records}"
-    )
+    if expect_detected:
+        assert forbidden_open_records, (
+            f"{site_label}: the mechanized family's own production detection "
+            f"must discover the embedded sentinel via {trigger.__qualname__} "
+            "-- a miss here is a real regression, not a characterization change"
+        )
+    else:
+        assert not forbidden_open_records, (
+            f"{site_label}: StaticWalker unexpectedly discovered the embedded "
+            f"sentinel via {trigger.__qualname__} -- M-8's own claim would be "
+            f"falsified by this run: {forbidden_open_records}"
+        )
 
 
 # ---------------------------------------------------------------------
@@ -239,6 +272,7 @@ def test_iteration_iter_only_characterized() -> None:
         fx.trigger_for_loop_iter_only,
         "task-38.8:iteration:iter-only",
         [(fx.ForbiddenIterOnly, "__iter__")],
+        expect_detected=False,
     )
 
 
@@ -247,6 +281,7 @@ def test_iteration_for_loop_next_only_characterized() -> None:
         fx.trigger_for_loop,
         "task-38.8:iteration:for-loop-next-only",
         [(fx.ForbiddenNextOnly, "__next__")],
+        expect_detected=False,
     )
 
 
@@ -255,6 +290,7 @@ def test_iteration_comprehension_next_only_characterized() -> None:
         fx.trigger_list_comprehension,
         "task-38.8:iteration:comprehension-next-only",
         [(fx.ForbiddenNextOnly, "__next__")],
+        expect_detected=False,
     )
 
 
@@ -268,6 +304,7 @@ def test_starred_unpacking_iter_only_characterized() -> None:
         fx.trigger_starred_unpacking_iter_only,
         "task-38.8:unpacking:iter-only",
         [(fx.ForbiddenUnpackIterOnly, "__iter__")],
+        expect_detected=False,
     )
 
 
@@ -276,6 +313,7 @@ def test_starred_unpacking_next_only_characterized() -> None:
         fx.trigger_starred_unpacking,
         "task-38.8:unpacking:next-only",
         [(fx.ForbiddenUnpackNextOnly, "__next__")],
+        expect_detected=False,
     )
 
 
@@ -289,6 +327,7 @@ def test_sync_context_manager_enter_characterized() -> None:
         fx.trigger_with_statement_enter_only,
         "task-38.8:context-manager:sync-enter",
         [(fx.ForbiddenEnterOnly, "__enter__")],
+        expect_detected=True,
     )
 
 
@@ -297,6 +336,7 @@ def test_sync_context_manager_exit_characterized() -> None:
         fx.trigger_with_statement,
         "task-38.8:context-manager:sync-exit",
         [(fx.ForbiddenExitOnly, "__exit__")],
+        expect_detected=True,
     )
 
 
@@ -305,6 +345,7 @@ def test_async_context_manager_aenter_characterized() -> None:
         fx.trigger_async_with_statement_enter_only,
         "task-38.8:context-manager:async-aenter",
         [(fx.ForbiddenAsyncEnterOnly, "__aenter__")],
+        expect_detected=True,
     )
 
 
@@ -313,6 +354,7 @@ def test_async_context_manager_aexit_characterized() -> None:
         fx.trigger_async_with_statement,
         "task-38.8:context-manager:async-aexit",
         [(fx.ForbiddenAsyncExitOnly, "__aexit__")],
+        expect_detected=True,
     )
 
 
@@ -326,6 +368,7 @@ def test_await_characterized() -> None:
         fx.trigger_await,
         "task-38.8:await:__await__",
         [(fx.ForbiddenAwaitable, "__await__")],
+        expect_detected=False,
     )
 
 
@@ -339,6 +382,7 @@ def test_async_iteration_aiter_only_characterized() -> None:
         fx.trigger_async_for_aiter_only,
         "task-38.8:async-iteration:aiter-only",
         [(fx.ForbiddenAiterOnly, "__aiter__")],
+        expect_detected=False,
     )
 
 
@@ -347,6 +391,7 @@ def test_async_iteration_anext_only_characterized() -> None:
         fx.trigger_async_for,
         "task-38.8:async-iteration:anext-only",
         [(fx.ForbiddenAnextOnly, "__anext__")],
+        expect_detected=False,
     )
 
 
@@ -360,6 +405,7 @@ def test_property_get_characterized() -> None:
         fx.trigger_property_get,
         "task-38.8:descriptor:property-get",
         [(fx.ForbiddenProperty, "value")],
+        expect_detected=True,
     )
 
 
@@ -368,6 +414,7 @@ def test_descriptor_get_characterized() -> None:
         fx.trigger_descriptor_get,
         "task-38.8:descriptor:raw-get",
         [(fx._ForbiddenGetDescriptor, "__get__")],  # noqa: SLF001
+        expect_detected=True,
     )
 
 
@@ -376,6 +423,7 @@ def test_descriptor_set_characterized() -> None:
         fx.trigger_descriptor_set,
         "task-38.8:descriptor:raw-set",
         [(fx._ForbiddenSetDescriptor, "__set__")],  # noqa: SLF001
+        expect_detected=True,
     )
 
 
@@ -384,6 +432,7 @@ def test_descriptor_delete_characterized() -> None:
         fx.trigger_descriptor_delete,
         "task-38.8:descriptor:raw-delete",
         [(fx._ForbiddenDeleteDescriptor, "__delete__")],  # noqa: SLF001
+        expect_detected=True,
     )
 
 
@@ -397,6 +446,7 @@ def test_equality_characterized() -> None:
         fx.trigger_equality,
         "task-38.8:operator:eq",
         [(fx.ForbiddenEq, "__eq__")],
+        expect_detected=False,
     )
 
 
@@ -405,6 +455,7 @@ def test_ordering_characterized() -> None:
         fx.trigger_less_than,
         "task-38.8:operator:lt",
         [(fx.ForbiddenLt, "__lt__")],
+        expect_detected=False,
     )
 
 
@@ -413,6 +464,7 @@ def test_arithmetic_add_characterized() -> None:
         fx.trigger_add,
         "task-38.8:operator:add",
         [(fx.ForbiddenAdd, "__add__")],
+        expect_detected=False,
     )
 
 
@@ -421,6 +473,7 @@ def test_arithmetic_reflected_add_characterized() -> None:
         fx.trigger_reflected_add,
         "task-38.8:operator:radd",
         [(fx.ForbiddenRadd, "__radd__")],
+        expect_detected=False,
     )
 
 
@@ -434,6 +487,7 @@ def test_truth_bool_characterized() -> None:
         fx.trigger_truth_bool,
         "task-38.8:truth:bool",
         [(fx.ForbiddenBool, "__bool__")],
+        expect_detected=False,
     )
 
 
@@ -442,6 +496,7 @@ def test_truth_len_fallback_characterized() -> None:
         fx.trigger_truth_len_fallback,
         "task-38.8:truth:len-fallback",
         [(fx.ForbiddenLenFallback, "__len__")],
+        expect_detected=False,
     )
 
 
@@ -456,6 +511,7 @@ def test_membership_contains_characterized() -> None:
         fx.trigger_membership_contains,
         "task-38.8:membership:contains",
         [(fx.ForbiddenContains, "__contains__")],
+        expect_detected=False,
     )
 
 
@@ -464,6 +520,7 @@ def test_membership_iteration_fallback_iter_only_characterized() -> None:
         fx.trigger_membership_iteration_fallback_iter_only,
         "task-38.8:membership:iteration-fallback-iter-only",
         [(fx.ForbiddenMembershipIterOnly, "__iter__")],
+        expect_detected=False,
     )
 
 
@@ -472,6 +529,7 @@ def test_membership_iteration_fallback_next_only_characterized() -> None:
         fx.trigger_membership_iteration_fallback,
         "task-38.8:membership:iteration-fallback-next-only",
         [(fx.ForbiddenMembershipNextOnly, "__next__")],
+        expect_detected=False,
     )
 
 
@@ -485,6 +543,7 @@ def test_subscript_get_characterized() -> None:
         fx.trigger_subscript_get,
         "task-38.8:subscription:getitem",
         [(fx.ForbiddenGetitem, "__getitem__")],
+        expect_detected=False,
     )
 
 
@@ -493,6 +552,7 @@ def test_subscript_set_characterized() -> None:
         fx.trigger_subscript_set,
         "task-38.8:subscription:setitem",
         [(fx.ForbiddenSetitem, "__setitem__")],
+        expect_detected=False,
     )
 
 
@@ -501,6 +561,7 @@ def test_subscript_delete_characterized() -> None:
         fx.trigger_subscript_delete,
         "task-38.8:subscription:delitem",
         [(fx.ForbiddenDelitem, "__delitem__")],
+        expect_detected=False,
     )
 
 
@@ -514,6 +575,7 @@ def test_hash_set_literal_characterized() -> None:
         fx.trigger_hash_set_literal,
         "task-38.8:hashing:set-literal",
         [(fx.ForbiddenHashable, "__hash__")],
+        expect_detected=False,
     )
 
 
@@ -522,6 +584,7 @@ def test_hash_dict_key_characterized() -> None:
         fx.trigger_hash_dict_key,
         "task-38.8:hashing:dict-key",
         [(fx.ForbiddenHashable, "__hash__")],
+        expect_detected=False,
     )
 
 
@@ -530,6 +593,7 @@ def test_hash_set_add_characterized() -> None:
         fx.trigger_hash_set_add,
         "task-38.8:hashing:set-add",
         [(fx.ForbiddenHashable, "__hash__")],
+        expect_detected=False,
     )
 
 
@@ -543,6 +607,7 @@ def test_format_fstring_characterized() -> None:
         fx.trigger_fstring_format,
         "task-38.8:formatting:fstring",
         [(fx.ForbiddenFormat, "__format__")],
+        expect_detected=False,
     )
 
 
@@ -551,6 +616,7 @@ def test_format_builtin_characterized() -> None:
         fx.trigger_format_builtin,
         "task-38.8:formatting:format-builtin",
         [(fx.ForbiddenFormat, "__format__")],
+        expect_detected=False,
     )
 
 
@@ -559,6 +625,7 @@ def test_format_dotformat_characterized() -> None:
         fx.trigger_dotformat_builtin,
         "task-38.8:formatting:dotformat",
         [(fx.ForbiddenFormat, "__format__")],
+        expect_detected=False,
     )
 
 
@@ -567,6 +634,7 @@ def test_format_str_fallback_characterized() -> None:
         fx.trigger_str_builtin,
         "task-38.8:formatting:str-fallback",
         [(fx.ForbiddenStr, "__str__")],
+        expect_detected=False,
     )
 
 
@@ -575,6 +643,7 @@ def test_format_repr_fallback_characterized() -> None:
         fx.trigger_repr_builtin,
         "task-38.8:formatting:repr-fallback",
         [(fx.ForbiddenRepr, "__repr__")],
+        expect_detected=False,
     )
 
 
@@ -583,163 +652,203 @@ def test_format_repr_fallback_characterized() -> None:
 # ---------------------------------------------------------------------
 
 _ALL_CASES: tuple[
-    tuple[str, Callable[..., object], tuple[tuple[type, str], ...]], ...
+    tuple[str, Callable[..., object], tuple[tuple[type, str], ...], bool], ...
 ] = (
     (
         "iteration:iter-only",
         fx.trigger_for_loop_iter_only,
         ((fx.ForbiddenIterOnly, "__iter__"),),
+        False,
     ),
     (
         "iteration:for-loop-next-only",
         fx.trigger_for_loop,
         ((fx.ForbiddenNextOnly, "__next__"),),
+        False,
     ),
     (
         "iteration:comprehension-next-only",
         fx.trigger_list_comprehension,
         ((fx.ForbiddenNextOnly, "__next__"),),
+        False,
     ),
     (
         "unpacking:iter-only",
         fx.trigger_starred_unpacking_iter_only,
         ((fx.ForbiddenUnpackIterOnly, "__iter__"),),
+        False,
     ),
     (
         "unpacking:next-only",
         fx.trigger_starred_unpacking,
         ((fx.ForbiddenUnpackNextOnly, "__next__"),),
+        False,
     ),
     (
         "context-manager:sync-enter",
         fx.trigger_with_statement_enter_only,
         ((fx.ForbiddenEnterOnly, "__enter__"),),
+        True,
     ),
     (
         "context-manager:sync-exit",
         fx.trigger_with_statement,
         ((fx.ForbiddenExitOnly, "__exit__"),),
+        True,
     ),
     (
         "context-manager:async-aenter",
         fx.trigger_async_with_statement_enter_only,
         ((fx.ForbiddenAsyncEnterOnly, "__aenter__"),),
+        True,
     ),
     (
         "context-manager:async-aexit",
         fx.trigger_async_with_statement,
         ((fx.ForbiddenAsyncExitOnly, "__aexit__"),),
+        True,
     ),
-    ("await:__await__", fx.trigger_await, ((fx.ForbiddenAwaitable, "__await__"),)),
+    (
+        "await:__await__",
+        fx.trigger_await,
+        ((fx.ForbiddenAwaitable, "__await__"),),
+        False,
+    ),
     (
         "async-iteration:aiter-only",
         fx.trigger_async_for_aiter_only,
         ((fx.ForbiddenAiterOnly, "__aiter__"),),
+        False,
     ),
     (
         "async-iteration:anext-only",
         fx.trigger_async_for,
         ((fx.ForbiddenAnextOnly, "__anext__"),),
+        False,
     ),
     (
         "descriptor:property-get",
         fx.trigger_property_get,
         ((fx.ForbiddenProperty, "value"),),
+        True,
     ),
     (
         "descriptor:raw-get",
         fx.trigger_descriptor_get,
         ((fx._ForbiddenGetDescriptor, "__get__"),),  # noqa: SLF001
+        True,
     ),
     (
         "descriptor:raw-set",
         fx.trigger_descriptor_set,
         ((fx._ForbiddenSetDescriptor, "__set__"),),  # noqa: SLF001
+        True,
     ),
     (
         "descriptor:raw-delete",
         fx.trigger_descriptor_delete,
         ((fx._ForbiddenDeleteDescriptor, "__delete__"),),  # noqa: SLF001
+        True,
     ),
-    ("operator:eq", fx.trigger_equality, ((fx.ForbiddenEq, "__eq__"),)),
-    ("operator:lt", fx.trigger_less_than, ((fx.ForbiddenLt, "__lt__"),)),
-    ("operator:add", fx.trigger_add, ((fx.ForbiddenAdd, "__add__"),)),
-    ("operator:radd", fx.trigger_reflected_add, ((fx.ForbiddenRadd, "__radd__"),)),
-    ("truth:bool", fx.trigger_truth_bool, ((fx.ForbiddenBool, "__bool__"),)),
+    ("operator:eq", fx.trigger_equality, ((fx.ForbiddenEq, "__eq__"),), False),
+    ("operator:lt", fx.trigger_less_than, ((fx.ForbiddenLt, "__lt__"),), False),
+    ("operator:add", fx.trigger_add, ((fx.ForbiddenAdd, "__add__"),), False),
+    (
+        "operator:radd",
+        fx.trigger_reflected_add,
+        ((fx.ForbiddenRadd, "__radd__"),),
+        False,
+    ),
+    ("truth:bool", fx.trigger_truth_bool, ((fx.ForbiddenBool, "__bool__"),), False),
     (
         "truth:len-fallback",
         fx.trigger_truth_len_fallback,
         ((fx.ForbiddenLenFallback, "__len__"),),
+        False,
     ),
     (
         "membership:contains",
         fx.trigger_membership_contains,
         ((fx.ForbiddenContains, "__contains__"),),
+        False,
     ),
     (
         "membership:iteration-fallback-iter-only",
         fx.trigger_membership_iteration_fallback_iter_only,
         ((fx.ForbiddenMembershipIterOnly, "__iter__"),),
+        False,
     ),
     (
         "membership:iteration-fallback-next-only",
         fx.trigger_membership_iteration_fallback,
         ((fx.ForbiddenMembershipNextOnly, "__next__"),),
+        False,
     ),
     (
         "subscription:getitem",
         fx.trigger_subscript_get,
         ((fx.ForbiddenGetitem, "__getitem__"),),
+        False,
     ),
     (
         "subscription:setitem",
         fx.trigger_subscript_set,
         ((fx.ForbiddenSetitem, "__setitem__"),),
+        False,
     ),
     (
         "subscription:delitem",
         fx.trigger_subscript_delete,
         ((fx.ForbiddenDelitem, "__delitem__"),),
+        False,
     ),
     (
         "hashing:set-literal",
         fx.trigger_hash_set_literal,
         ((fx.ForbiddenHashable, "__hash__"),),
+        False,
     ),
     (
         "hashing:dict-key",
         fx.trigger_hash_dict_key,
         ((fx.ForbiddenHashable, "__hash__"),),
+        False,
     ),
     (
         "hashing:set-add",
         fx.trigger_hash_set_add,
         ((fx.ForbiddenHashable, "__hash__"),),
+        False,
     ),
     (
         "formatting:fstring",
         fx.trigger_fstring_format,
         ((fx.ForbiddenFormat, "__format__"),),
+        False,
     ),
     (
         "formatting:format-builtin",
         fx.trigger_format_builtin,
         ((fx.ForbiddenFormat, "__format__"),),
+        False,
     ),
     (
         "formatting:dotformat",
         fx.trigger_dotformat_builtin,
         ((fx.ForbiddenFormat, "__format__"),),
+        False,
     ),
     (
         "formatting:str-fallback",
         fx.trigger_str_builtin,
         ((fx.ForbiddenStr, "__str__"),),
+        False,
     ),
     (
         "formatting:repr-fallback",
         fx.trigger_repr_builtin,
         ((fx.ForbiddenRepr, "__repr__"),),
+        False,
     ),
 )
 
@@ -747,16 +856,46 @@ _ALL_CASES: tuple[
 def test_all_families_and_dispatch_events_characterized() -> None:
     """`docs/prompts/task-38.8.md` §3's own summary requirement: every
     family named in §2 -- and every independently-isolated dispatch
-    event within it -- is walked, and none produces a `CallRecord` for
-    its embedded sentinel. A single sweep over the same case list the
-    individual tests above use, so a case can never be silently
-    dropped from the "all" count without also failing to appear as its
-    own named test."""
+    event within it -- is walked. A single sweep over the same case
+    list the individual tests above use, so a case can never be
+    silently dropped from the "all" count without also failing to
+    appear as its own named test.
+
+    Split explicitly into two sub-sweeps, never merged into one
+    "all clear" claim: the 8 mechanized (context-manager/descriptor)
+    cases must each positively detect their sentinel; the remaining 28
+    unmechanized cases must each still show zero detection -- the
+    8+28 split itself is asserted, so a case silently moving between
+    the two groups (e.g. a future change accidentally widening
+    detection) fails loudly here."""
     assert len(_ALL_CASES) == 36, (
         "case count changed -- update this assertion deliberately, "
         "never silently, if a dispatch event was added or removed"
     )
-    for site_label, trigger, sentinel_targets in _ALL_CASES:
+
+    supported_cases = [c for c in _ALL_CASES if c[3]]
+    unsupported_cases = [c for c in _ALL_CASES if not c[3]]
+    assert len(supported_cases) == 8, (
+        "expected exactly 8 mechanized (context-manager + descriptor) "
+        "dispatch-event cases -- update deliberately if ADR-032's Option D "
+        "scope ever changes"
+    )
+    assert len(unsupported_cases) == 28, (
+        "expected exactly 28 still-unsupported dispatch-event cases "
+        "(9 families' worth) -- update deliberately, never silently"
+    )
+
+    for site_label, trigger, sentinel_targets, expect_detected in supported_cases:
         _assert_family_characterized(
-            trigger, f"task-38.8:{site_label}", sentinel_targets
+            trigger,
+            f"task-38.8:{site_label}",
+            sentinel_targets,
+            expect_detected=expect_detected,
+        )
+    for site_label, trigger, sentinel_targets, expect_detected in unsupported_cases:
+        _assert_family_characterized(
+            trigger,
+            f"task-38.8:{site_label}",
+            sentinel_targets,
+            expect_detected=expect_detected,
         )

@@ -12,6 +12,21 @@ from audit_harness.report import build_report
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+#: A minimal, all-clear ``implicit_dispatch`` section (Task 38.8 schema
+#: 38.8.0) -- shared by every hand-built ``build_report`` call below
+#: that is not itself testing this section's own gating behavior.
+_CLEAN_IMPLICIT_DISPATCH: dict[str, object] = {
+    "mechanized_protocol_families": ["context_manager", "descriptor"],
+    "unsupported_protocol_families": [],
+    "syntax_sites_total": 0,
+    "dispatch_candidates_total": 0,
+    "resolved_dispatches": 0,
+    "unresolved_dispatches": 0,
+    "resolved_non_descriptor_exclusion": 0,
+    "explicit_path_duplicates": 0,
+    "dispatch_events_by_method": {},
+}
+
 
 def test_deterministic_repeated_runs_produce_identical_report() -> None:
     """Two runs of the full audit against the same commit, no other
@@ -187,6 +202,7 @@ def test_false_negative_fixture_sets_self_test_failed() -> None:
             "detected": 4,
             "detail": ["one deliberately missed for this test"],
         },
+        implicit_dispatch=_CLEAN_IMPLICIT_DISPATCH,
     )
     assert report.data["self_test_failed"] is True
     assert report.data["exit_code"] != 0
@@ -220,6 +236,7 @@ def test_false_negative_fixture_sets_self_test_failed() -> None:
         },
         runtime_denial={"success": True},
         negative_controls={"total": 5, "detected": 5, "detail": []},
+        implicit_dispatch=_CLEAN_IMPLICIT_DISPATCH,
     )
     assert clean.data["self_test_failed"] is False
     assert clean.data["exit_code"] == 0

@@ -21,7 +21,7 @@ from audit_harness import discovery, module_state, runtime_denial
 from audit_harness.identity import EXACT_IDENTITY_POLICY_VERSION
 from audit_harness.report import Report, build_report
 from audit_harness.self_test import run_self_tests
-from audit_harness.trace import run_trace
+from audit_harness.trace import UNSUPPORTED_PROTOCOL_FAMILIES, run_trace
 
 _MODULE_STATE_PACKAGES: tuple[str, ...] = (
     "agents",
@@ -123,9 +123,15 @@ def run_full_audit(repo_root: Path) -> Report:
     }
 
     tr = run_trace()
+    # Task 38.8 §8: `calls_total`/`calls_unresolved` and everything
+    # derived from them below remain explicit-call-only -- `tr.calls`
+    # also carries the new implicit-dispatch records (`resolution_
+    # mechanism` tagged `implicit-*`), which belong only in the
+    # `implicit_dispatch` section built further down, never here.
+    explicit_calls = tr.explicit_calls
     unresolved_detail_counts = Counter(
         f"{c.site} :: {c.callee_text}"
-        for c in tr.calls
+        for c in explicit_calls
         if c.verdict.category == "unresolved"
     )
     trace_dict = {
@@ -135,7 +141,7 @@ def run_full_audit(repo_root: Path) -> Report:
         "nodes_total": len(tr.nodes),
         "nodes_unresolved": tr.nodes_unresolved,
         "nodes_unresolved_detail": [n.qualname for n in tr.nodes if n.unresolved],
-        "calls_total": len(tr.calls),
+        "calls_total": len(explicit_calls),
         "calls_unresolved": tr.calls_unresolved,
         "calls_unresolved_detail": sorted(unresolved_detail_counts),
         # Task 38.7 Requirement: the raw `calls_unresolved` count and the
@@ -150,14 +156,20 @@ def run_full_audit(repo_root: Path) -> Report:
         ),
         "identity_resolution_buckets": {
             "project_source_available": sum(
-                1 for c in tr.calls if c.verdict.category == "project_source_available"
+                1
+                for c in explicit_calls
+                if c.verdict.category == "project_source_available"
             ),
             "exact_identity_policy": sum(
-                1 for c in tr.calls if c.verdict.category == "exact_identity_policy"
+                1
+                for c in explicit_calls
+                if c.verdict.category == "exact_identity_policy"
             ),
-            "forbidden": sum(1 for c in tr.calls if c.verdict.category == "forbidden"),
+            "forbidden": sum(
+                1 for c in explicit_calls if c.verdict.category == "forbidden"
+            ),
             "unresolved": sum(
-                1 for c in tr.calls if c.verdict.category == "unresolved"
+                1 for c in explicit_calls if c.verdict.category == "unresolved"
             ),
         },
         "exact_identity_policy_version": EXACT_IDENTITY_POLICY_VERSION,
@@ -180,6 +192,20 @@ def run_full_audit(repo_root: Path) -> Report:
         "buckets": dict(bucket_counts),
         "parse_errors": list(parse_errors),
         "parse_errors_total": len(parse_errors),
+    }
+
+    implicit_dispatch_dict = {
+        "mechanized_protocol_families": ["context_manager", "descriptor"],
+        "unsupported_protocol_families": list(UNSUPPORTED_PROTOCOL_FAMILIES),
+        "syntax_sites_total": tr.implicit_syntax_sites_total,
+        "dispatch_candidates_total": tr.implicit_dispatch_candidates_total,
+        "resolved_dispatches": tr.implicit_dispatch_resolved,
+        "unresolved_dispatches": tr.implicit_dispatch_unresolved,
+        "resolved_non_descriptor_exclusion": (
+            tr.implicit_resolved_non_descriptor_exclusion_total
+        ),
+        "explicit_path_duplicates": tr.implicit_dispatch_explicit_path_duplicates,
+        "dispatch_events_by_method": tr.implicit_dispatch_by_method,
     }
 
     node_classes, unimportable_nodes = _load_classes([n.qualname for n in tr.nodes])
@@ -209,6 +235,7 @@ def run_full_audit(repo_root: Path) -> Report:
         module_state=module_state_dict,
         runtime_denial=runtime_denial_dict,
         negative_controls=negative_controls,
+        implicit_dispatch=implicit_dispatch_dict,
     )
 
 

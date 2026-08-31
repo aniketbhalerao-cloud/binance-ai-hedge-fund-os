@@ -12,9 +12,11 @@ from __future__ import annotations
 from audit_harness.self_test import run_self_tests
 
 
-def test_all_five_negative_controls_are_detected() -> None:
+def test_all_seven_negative_controls_are_detected() -> None:
+    """5 original (Task 38.6) + 2 added by Task 38.8 Phase A.1 for the
+    2 newly-mechanized implicit-dispatch families."""
     results = run_self_tests()
-    assert len(results) == 5
+    assert len(results) == 7
     undetected = [r for r in results if not r.detected]
     assert not undetected, (
         f"negative controls not detected: {[(r.name, r.detail) for r in undetected]}"
@@ -50,5 +52,23 @@ def test_connecting_client_is_intercepted_before_any_real_connection() -> None:
         r
         for r in run_self_tests()
         if r.name == "db_redis_exchange_connection_intercepted"
+    )
+    assert result.detected
+
+
+def test_implicit_context_manager_dispatch_is_detected() -> None:
+    result = next(
+        r
+        for r in run_self_tests()
+        if r.name == "implicit_context_manager_dispatch_detected"
+    )
+    assert result.detected
+
+
+def test_implicit_descriptor_dispatch_is_detected() -> None:
+    result = next(
+        r
+        for r in run_self_tests()
+        if r.name == "implicit_descriptor_dispatch_detected"
     )
     assert result.detected

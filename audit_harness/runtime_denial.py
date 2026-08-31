@@ -15,6 +15,7 @@ operation; nothing downstream of a patched target ever executes.
 from __future__ import annotations
 
 import builtins
+import inspect
 import multiprocessing
 import os
 import pathlib
@@ -176,6 +177,31 @@ class RuntimeDenialResult:
         )
 
 
+_STATIC_MISSING = object()
+
+
+def _save_original(obj: object, attr: str) -> object:
+    """The exact object to restore ``obj.attr`` to when this patch is
+    undone -- never the *bound* result plain ``getattr`` would produce
+    for a classmethod/staticmethod/descriptor found on a class. Plain
+    ``getattr(cls, name)`` on a ``@classmethod`` returns a fresh bound
+    method each time; saving *that* and later ``setattr``-ing it back
+    permanently replaces the class's own ``classmethod`` descriptor
+    with a plain bound-method object -- a real, observed corruption
+    (`dotenv.parser.Position.start`, a third-party ``@classmethod``
+    matching ``LIFECYCLE_METHOD_NAMES``) that silently changes what a
+    *later*, unrelated static analysis pass sees on the very same class
+    object for the rest of the process, breaking Harness Requirement 1's
+    byte-identical-repeated-runs guarantee. ``inspect.getattr_static``
+    reads the *stored* attribute value directly (never invoking a
+    descriptor's own ``__get__``), so it preserves the original
+    classmethod/staticmethod/descriptor object exactly; it falls back to
+    plain ``getattr`` only for objects it cannot introspect this way
+    (e.g. some C-implemented modules)."""
+    static = inspect.getattr_static(obj, attr, _STATIC_MISSING)
+    return static if static is not _STATIC_MISSING else getattr(obj, attr)
+
+
 @contextmanager
 def _apply_patches(extra_targets: Iterable[tuple[str, str, object, str]] = ()):  # type: ignore[no-untyped-def]
     applied: list[_Patch] = []
@@ -185,7 +211,7 @@ def _apply_patches(extra_targets: Iterable[tuple[str, str, object, str]] = ()): 
             *_logging_targets(),
             *extra_targets,
         ):
-            original = getattr(obj, attr)
+            original = _save_original(obj, attr)
             setattr(obj, attr, _boom(label))
             applied.append(_Patch(category, label, obj, attr, original))
         yield applied

@@ -21,14 +21,23 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
-#: 38.7.0 (Task 38.7): additive-only bump adding
-#: ``calls_unresolved_detail_multiplicity`` -- no existing field
-#: removed or renamed. Layer 2 of Task 38.7's Gate Outcome
-#: Requirements (``unimportable_nodes``) is closed via the preferred
-#: path (the ``mappingproxy`` qualname fix in ``audit_harness.identity``
-#: makes ``unimportable_nodes`` naturally empty), so ``all_clear``
-#: below is otherwise unchanged from schema 38.6.0.
-SCHEMA_VERSION = "38.7.0"
+#: 38.8.0 (Task 38.8 Phase A.1, ADR-032 Option D): additive-only bump
+#: adding the new ``implicit_dispatch`` section -- ``syntax_sites_total``,
+#: ``dispatch_candidates_total``, ``resolved_dispatches``,
+#: ``unresolved_dispatches``, ``resolved_non_descriptor_exclusion``,
+#: ``explicit_path_duplicates`` (an annotation on already-counted sites,
+#: never a fifth addend), ``dispatch_events_by_method`` (the
+#: context-manager enter/exit/aenter/aexit and descriptor
+#: get/set/delete breakdown, each counted independently), and the two
+#: fields required regardless of architecture:
+#: ``mechanized_protocol_families`` and ``unsupported_protocol_families``
+#: (ADR-032's own exact 9-family list, verbatim). No existing field is
+#: removed, renamed, or redefined -- ``nodes_unresolved``/
+#: ``calls_unresolved`` remain explicit-call-only, exactly as `docs/prompts/
+#: task-38.8.md` §8 requires. Per Task 38.8 §6's "nonzero keeps the gate
+#: at HOLD" discipline, ``all_clear`` below additionally requires
+#: ``unresolved_dispatches == 0``.
+SCHEMA_VERSION = "38.8.0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,17 +59,26 @@ def build_report(
     module_state: dict[str, Any],
     runtime_denial: dict[str, Any],
     negative_controls: dict[str, Any],
+    implicit_dispatch: dict[str, Any],
 ) -> Report:
     """Assemble the full machine-readable result and compute
     ``exit_code`` per the Gate Rule: 0 only if every unresolved/
     unexplained count is zero, every runtime-denial category passed,
-    and every negative control was detected on this same run."""
+    and every negative control was detected on this same run.
+
+    ``implicit_dispatch`` is Task 38.8 Phase A.1's own additive section
+    (schema 38.8.0, §8) -- required, never defaulted, so a caller can
+    never silently omit it and have this function assume a clean
+    result on its behalf. Its own ``unresolved_dispatches`` is held to
+    the identical "nonzero keeps the gate at HOLD" discipline as
+    ``nodes_unresolved``/``calls_unresolved`` (§6)."""
     nodes_total = trace["nodes_total"]
     nodes_unresolved = trace["nodes_unresolved"]
     calls_total = trace["calls_total"]
     calls_unresolved = trace["calls_unresolved"]
     module_state_total = module_state["candidates_total"]
     module_state_unexplained = module_state["unexplained_total"]
+    implicit_dispatch_unresolved = implicit_dispatch["unresolved_dispatches"]
 
     negative_controls_total = negative_controls["total"]
     negative_controls_detected = negative_controls["detected"]
@@ -72,6 +90,7 @@ def build_report(
         nodes_unresolved == 0
         and calls_unresolved == 0
         and module_state_unexplained == 0
+        and implicit_dispatch_unresolved == 0
         and runtime_denial_ok
         and not self_test_failed
         and discovery.get("parse_errors_total", 0) == 0
@@ -106,6 +125,7 @@ def build_report(
         "negative_controls_total": negative_controls_total,
         "negative_controls_detected": negative_controls_detected,
         "negative_controls_detail": negative_controls["detail"],
+        "implicit_dispatch": implicit_dispatch,
         "self_test_failed": self_test_failed,
         "exit_code": exit_code,
     }

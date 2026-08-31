@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from audit_harness.module_state import scan_module
 from audit_harness.runtime_denial import ForbiddenOperationError, _apply_patches
 from audit_harness.trace import StaticWalker
+from tests.audit_harness.fixtures import implicit_dispatch as implicit_fx
 from tests.audit_harness.fixtures import negative_controls as fx
 
 
@@ -139,6 +140,50 @@ def _check_connecting_client_intercepted() -> NegativeControlResult:
     )
 
 
+def _check_implicit_context_manager_dispatch_detected() -> NegativeControlResult:
+    """Task 38.8 Phase A.1 (§8's "Negative-control results", mirroring
+    the existing shape): the same production mechanism `run_audit`
+    itself relies on must still detect the sentinel embedded in
+    ``__enter__`` via ordinary ``with`` syntax, using the frozen Phase
+    A.0 fixture -- one implementation, not a second detector that could
+    silently drift from the one `tests/audit_harness/
+    test_task_38_8_phase_a1_mechanism.py` already exercises via pytest."""
+    walker = StaticWalker()
+    walker.walk(
+        implicit_fx.trigger_with_statement_enter_only,
+        "self-test:implicit-context-manager",
+    )
+    hit = any(
+        c.callee_text == "open" and c.verdict.category == "forbidden"
+        for c in walker.call_records
+    )
+    return NegativeControlResult(
+        "implicit_context_manager_dispatch_detected",
+        hit,
+        "open(...) inside ForbiddenEnterOnly.__enter__, triggered via `with obj:`",
+    )
+
+
+def _check_implicit_descriptor_dispatch_detected() -> NegativeControlResult:
+    """The descriptor-family counterpart -- M-8's own "sharpest
+    instance" (a bare attribute read with zero ``ast.Call`` node),
+    using the frozen Phase A.0 ``@property`` fixture."""
+    walker = StaticWalker()
+    walker.walk(
+        implicit_fx.trigger_property_get, "self-test:implicit-descriptor"
+    )
+    hit = any(
+        c.callee_text == "open" and c.verdict.category == "forbidden"
+        for c in walker.call_records
+    )
+    return NegativeControlResult(
+        "implicit_descriptor_dispatch_detected",
+        hit,
+        "open(...) inside ForbiddenProperty.value's fget, triggered via a bare "
+        "attribute read",
+    )
+
+
 def run_self_tests() -> tuple[NegativeControlResult, ...]:
     return (
         _check_forbidden_post_init(),
@@ -146,4 +191,6 @@ def run_self_tests() -> tuple[NegativeControlResult, ...]:
         _check_module_global_mutation(),
         _check_direct_os_open(),
         _check_connecting_client_intercepted(),
+        _check_implicit_context_manager_dispatch_detected(),
+        _check_implicit_descriptor_dispatch_detected(),
     )

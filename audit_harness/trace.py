@@ -107,9 +107,131 @@ class CallRecord:
     verdict: IdentityVerdict
 
 
+@dataclass(frozen=True, slots=True)
+class _DescriptorOutcome:
+    """Task 38.8 Phase A.1: the three ways a candidate descriptor
+    dispatch (`_evaluate_descriptor_dispatch`) can resolve, once the
+    receiver's own kind (instance/class) and type are already known --
+    a "no_dispatch" (sound, certain non-applicability, counted as
+    `resolved_non_descriptor_exclusion`), a "resolved" concrete target,
+    or an "ambiguous" one (a non-data descriptor an instance's own
+    `__dict__` could, but is not proven to, shadow -- item 4)."""
+
+    kind: str
+    target: object | None = None
+    target_owner: type | None = None
+    rationale: str | None = None
+
+
 _REGISTRATION_METHODS = frozenset(
     {"register", "register_singleton", "register_factory", "register_instance"}
 )
+
+#: Task 38.8 Phase A.1 (ADR-032 Option D, 2026-08-24): the exactly-2-of-11
+#: implicit-protocol-dispatch families this walker mechanizes -- context
+#: managers and descriptors. Each dispatch stage is independently
+#: modeled -- never an enter/exit or get/set/delete pair collapsed into
+#: one event, per ADR-032's own "syntax sites vs. dispatch events"
+#: framing.
+_SYNC_CONTEXT_MANAGER_METHODS: tuple[str, str] = ("__enter__", "__exit__")
+_ASYNC_CONTEXT_MANAGER_METHODS: tuple[str, str] = ("__aenter__", "__aexit__")
+
+#: An `ast.Attribute` node's own context selects the one candidate
+#: descriptor operation implicated at that site -- `Load`->`__get__`,
+#: `Store`->`__set__`, `Del`->`__delete__` (ADR-032's own framing). Keyed
+#: by the exact `ast.expr_context` subclass, never by string/name.
+_DESCRIPTOR_CONTEXT_DUNDER: dict[type, str] = {
+    ast.Load: "__get__",
+    ast.Store: "__set__",
+    ast.Del: "__delete__",
+}
+
+#: Correction item 6: the walker's descriptor-outcome algorithm assumes
+#: `object.__getattribute__`/`object.__setattr__`/`object.__delattr__`
+#: semantics for an instance receiver (`type.__getattribute__`/
+#: `type.__setattr__`/`type.__delattr__` for a class receiver, via the
+#: metaclass). Each key is the descriptor operation an `ast.Attribute`
+#: context selects; each value is the base machinery that operation's
+#: soundness actually depends on -- if the statically known receiver
+#: class (or its metaclass, for a class receiver) overrides that exact
+#: method, the walker cannot claim the ordinary descriptor-lookup
+#: algorithm below is what actually runs.
+_ATTRIBUTE_ACCESS_OVERRIDE_DUNDER: dict[str, str] = {
+    "__get__": "__getattribute__",
+    "__set__": "__setattr__",
+    "__delete__": "__delattr__",
+}
+
+#: ADR-032's own exact enumeration of the 9 (of 11) protocol families
+#: this Phase A.1 decision leaves unmechanized -- copied verbatim, in
+#: the same grouping and order ADR-032 records them, so no report,
+#: test, or comment ever substitutes a different list. Reported,
+#: unchanged, as the global `unsupported_protocol_families` field (§8).
+UNSUPPORTED_PROTOCOL_FAMILIES: tuple[str, ...] = (
+    "iteration/comprehensions",
+    "unpacking",
+    "await/async iteration",
+    "equality/ordering/arithmetic operators including reflected forms",
+    "truth testing",
+    "membership",
+    "subscription/assignment/deletion",
+    "hashing",
+    "formatting including __str__/__repr__ fallback",
+)
+
+#: Correction item 5: a descriptor syntax site whose receiver is not a
+#: single-hop `ast.Name` (a chained/attribute-of-attribute expression
+#: such as `self.child.attr`) is outside this walker's single-hop
+#: receiver-resolution reach. Never silently dropped -- an explicit,
+#: fail-closed unresolved implicit-dispatch record is emitted instead,
+#: naming exactly why, so the residual is visible in the machine-
+#: readable output rather than invisible by omission.
+_CHAINED_RECEIVER_RATIONALE = (
+    "chained/non-Name receiver expression; this walker's descriptor "
+    "resolution is bounded to a single-hop Name receiver and cannot "
+    "soundly resolve a multi-hop attribute chain"
+)
+
+#: The one, single non-executing attribute-lookup primitive every new
+#: implicit-dispatch resolution path in this module uses (Task 38.8 §6/
+#: item 3: "StaticWalker must never execute audited trigger bodies,
+#: protocol methods, descriptors or metaclass hooks to discover a
+#: target"). `inspect.getattr_static` walks `__dict__`/MRO directly and
+#: never invokes `__getattribute__`, `__getattr__`, a descriptor's own
+#: `__get__`, or a metaclass hook -- unlike plain `getattr`/`hasattr`,
+#: which this module's new resolution paths never call on a
+#: caller-influenced (audited) object.
+_MISSING = object()
+
+
+def _static_get(obj: object, name: str) -> object:
+    return inspect.getattr_static(obj, name, _MISSING)
+
+
+def _static_implements(value: object, dunder: str) -> bool:
+    """Whether ``type(value)`` defines ``dunder`` -- via
+    :func:`_static_get` on the *type*, never ``hasattr``/``getattr`` on
+    ``value`` itself or its type (either could invoke a hostile
+    metaclass's own ``__getattribute__``)."""
+    return _static_get(type(value), dunder) is not _MISSING
+
+
+def _static_is_data_descriptor(value: object) -> bool:
+    return _static_implements(value, "__set__") or _static_implements(
+        value, "__delete__"
+    )
+
+
+def _overrides_base_dunder(cls: type, dunder_name: str, base: type) -> bool:
+    """Correction item 6: whether ``cls`` overrides ``dunder_name``
+    beyond ``base``'s own default implementation -- a non-executing MRO
+    comparison (``_static_get`` on both, then identity), never
+    ``hasattr``/``getattr``/``issubclass``-based guessing. ``base`` is
+    ``object`` for an instance receiver's attribute-access machinery,
+    ``type`` for a class receiver's (via its metaclass)."""
+    found = _static_get(cls, dunder_name)
+    default = _static_get(base, dunder_name)
+    return found is not _MISSING and found is not default
 
 #: A local variable assigned the return value of one of these stdlib
 #: functions has a fixed, documented return type -- a structural fact
@@ -356,6 +478,23 @@ class StaticWalker:
         #: own ``__init__``, not guessed). A real run's caller populates
         #: this; a fixture-only test leaves it empty.
         self.instance_attribute_types: dict[tuple[type, str], type] = {}
+        #: Task 38.8 Phase A.1 (§4/§8): one implicit-dispatch *syntax
+        #: site* -- one `with`/`async with` item (which itself yields
+        #: two dispatch candidates, enter+exit), one bare `ast.Attribute`
+        #: site (one candidate), or one `ast.AugAssign` attribute target
+        #: (which itself yields two dispatch candidates, `__get__` then
+        #: `__set__` -- correction item 2: the site is one, the
+        #: candidates are two, never conflated into two sites) --
+        #: counted regardless of outcome (resolved, unresolved,
+        #: ambiguous, or excluded).
+        self.implicit_syntax_sites_total: int = 0
+        #: A descriptor-family site whose receiver *and* attribute were
+        #: both soundly resolved, and that attribute's own type
+        #: definitively does not implement the context-appropriate
+        #: dunder -- a sound, certain "no dispatch occurs here" (ADR-032's
+        #: `resolved_non_descriptor_exclusion`), counted separately and
+        #: excluded from the `resolved`/`unresolved` partition entirely.
+        self.implicit_resolved_non_descriptor_exclusion_total: int = 0
 
     # -- resolution helpers ------------------------------------------
 
@@ -1190,6 +1329,758 @@ class StaticWalker:
             parts.append(("hint", name, ident(val)))
         return tuple(parts)
 
+    # -- Task 38.8 Phase A.1: implicit context-manager/descriptor -----
+    # dispatch (ADR-032 Option D). Both mechanisms reuse the *same*
+    # identity-first discipline `_resolve_target`/`classify_callable`
+    # already use for explicit calls -- AST syntax only ever selects
+    # which protocol-method candidate is under consideration at a site
+    # (ADR-032 criterion 1); the resolved, live callable identity that
+    # candidate points to is what actually receives a classification
+    # verdict. Neither mechanism introduces a new recursion or budget
+    # path: `_recurse_into_dispatch_target` below funnels into the
+    # exact same `walk()` entry point, so the existing
+    # `(callable identity, specialization)` visited-state dedup and
+    # `max_total_walk_steps` budget govern this recursion identically to
+    # any other discovered callable. Every attribute lookup below goes
+    # through `_static_get`/`_static_implements` -- never plain
+    # `getattr`/`hasattr` on a caller-influenced object -- so resolving
+    # a candidate never itself invokes a descriptor's `__get__`, a
+    # metaclass hook, or any other audited code (item 3).
+
+    def _recurse_into_dispatch_target(
+        self,
+        target: object,
+        verdict: IdentityVerdict,
+        site_label: str,
+        owner_class: type | None,
+        always_follow_modules: frozenset[str],
+        *,
+        force: bool = False,
+    ) -> None:
+        """``force`` is set only for a genuinely ambiguous descriptor
+        site (a non-data descriptor whose dispatch an instance's own
+        ``__dict__`` could, but is not proven to, shadow -- see
+        ``_descriptor_outcome_for_instance``): the *site's own* verdict
+        must stay ``unresolved`` (never claimed resolved-safe), but a
+        forbidden call reachable through that candidate target is still
+        worth discovering, bounded by the exact same visited-state/
+        budget machinery as any other recursion."""
+        if not (inspect.isfunction(target) or inspect.ismethod(target)):
+            return
+        target_module = getattr(target, "__module__", None)
+        always_follow = target_module in always_follow_modules
+        source_verdict = verdict.category == "project_source_available"
+        if not force and not source_verdict and not always_follow:
+            return
+        self.walk(
+            target,
+            site_label,
+            owner_class=owner_class,
+            always_follow_modules=always_follow_modules,
+        )
+
+    # -- Context managers ----------------------------------------------
+
+    def _handle_with_statement(
+        self,
+        node: ast.With | ast.AsyncWith,
+        site_label: str,
+        g: dict[str, object],
+        loc: dict[str, object],
+        owner_class: type | None,
+        param_hints: dict[str, type],
+        local_var_types: dict[str, type],
+        always_follow_modules: frozenset[str],
+    ) -> None:
+        """Each item independently dispatches its enter method *and*
+        its exit method (two events, never one) --
+        `docs/prompts/task-38.8.md` §2/§3, ADR-032's own "syntax sites
+        vs. dispatch events" framing. For `with a, b:`, every item's
+        enter fires in program order, then every item's exit fires in
+        *reverse* order -- the real interpreter's own cleanup semantics
+        (equivalent to nested `with a:\\n    with b:`), never collapsed
+        or reordered (item 6). Each item's own construction (when
+        `item.context_expr` is itself a constructor call) is a distinct,
+        already-discovered `ast.Call` node the normal call-handling loop
+        resolves on its own -- never the thing this method looks at."""
+        is_async = isinstance(node, ast.AsyncWith)
+        enter_method, exit_method = (
+            _ASYNC_CONTEXT_MANAGER_METHODS
+            if is_async
+            else _SYNC_CONTEXT_MANAGER_METHODS
+        )
+        resolved_items: list[tuple[ast.expr, type | None]] = []
+        for item in node.items:
+            self.implicit_syntax_sites_total += 1
+            receiver_type = self._infer_type(
+                item.context_expr, g, loc, owner_class, param_hints, local_var_types
+            )
+            resolved_items.append((item.context_expr, receiver_type))
+
+        for ctx_expr, receiver_type in resolved_items:
+            self._dispatch_context_manager_event(
+                ctx_expr, receiver_type, enter_method, site_label, always_follow_modules
+            )
+        for ctx_expr, receiver_type in reversed(resolved_items):
+            self._dispatch_context_manager_event(
+                ctx_expr, receiver_type, exit_method, site_label, always_follow_modules
+            )
+
+    def _unwrap_special_method_target(self, raw: object) -> object | None:
+        """Correction item 7: what ``_PyObject_LookupSpecial``'s own
+        binding semantics actually run for a type-level special-method
+        lookup -- never the raw looked-up object treated as-is,
+        regardless of its shape.
+
+        An ordinary function (the overwhelming common case -- a plain
+        ``def __enter__(self): ...``) is returned unchanged. A
+        ``staticmethod``/``classmethod`` wrapper is unwrapped to its own
+        ``__func__`` -- a plain, non-executing attribute read, safe the
+        same way ``_unwrap_descriptor_target`` already is for
+        descriptors. Anything else that itself implements ``__get__``
+        (a genuine descriptor placed as the special method) is a
+        residual this walker cannot soundly resolve without executing
+        that descriptor's own ``__get__`` -- returned as ``None`` so the
+        caller fails closed instead of misreporting the wrapper object
+        itself as the effective callable."""
+        if inspect.isfunction(raw):
+            return raw
+        if isinstance(raw, (staticmethod, classmethod)):
+            return raw.__func__
+        if _static_implements(raw, "__get__"):
+            return None
+        return raw
+
+    def _dispatch_context_manager_event(
+        self,
+        ctx_expr: ast.expr,
+        receiver_type: type | None,
+        method_name: str,
+        site_label: str,
+        always_follow_modules: frozenset[str],
+    ) -> None:
+        """A dunder protocol method the interpreter looks up via special
+        (type-only) method lookup, per CPython's own documented rule --
+        this bypasses instance `__dict__` unconditionally, so unlike
+        ordinary attribute access (the descriptor family below) there is
+        no instance-shadowing ambiguity to model here: once the
+        receiver's type is soundly known, whether it implements this
+        method is certain either way."""
+        ctx_text = ast.unparse(ctx_expr)
+        callee_text = f"{ctx_text}.{method_name}"
+        mechanism = f"implicit-context-manager-{method_name}"
+        if receiver_type is None:
+            # Fail-closed (Task 38.8 §6): the receiver could not be
+            # soundly resolved -- an explicit, machine-readable
+            # unresolved record, never a default-safe verdict and never
+            # silently dropped.
+            verdict = IdentityVerdict(
+                None,
+                None,
+                "unresolved",
+                "implicit context-manager receiver type not soundly resolved",
+                False,
+            )
+            self.call_records.append(
+                CallRecord(site_label, callee_text, mechanism, verdict)
+            )
+            return
+
+        raw = _static_get(receiver_type, method_name)
+        if raw is _MISSING:
+            # Correction item 3: `implicit_resolved_non_descriptor_
+            # exclusion_total` is documented, ADR-032-wide, as a
+            # descriptor-family-only counter (a resolved receiver whose
+            # *attribute* definitively is not a descriptor) -- a missing
+            # context-manager protocol method is not that. `with obj:`
+            # requires this method to exist; a receiver soundly resolved
+            # to a type that lacks it means either this walker's own
+            # type resolution is wrong, or the real code would raise
+            # `TypeError`/`AttributeError` at runtime -- neither
+            # possibility is "no dispatch occurs, soundly and safely".
+            # No dedicated resolved-missing category exists for this
+            # family, so this fails closed: an explicit, machine-
+            # readable unresolved implicit-dispatch record, never a
+            # silent drop and never miscounted into the descriptor-only
+            # exclusion bucket.
+            verdict = IdentityVerdict(
+                None,
+                None,
+                "unresolved",
+                f"{receiver_type.__module__}.{receiver_type.__qualname__} has no "
+                f"{method_name}; the with-statement protocol requires it, so this "
+                "is a statically-known-missing context-manager method, not a "
+                "sound non-dispatch exclusion",
+                False,
+            )
+            self.call_records.append(
+                CallRecord(site_label, callee_text, mechanism, verdict)
+            )
+            return
+
+        target = self._unwrap_special_method_target(raw)
+        if target is None:
+            # Correction item 7: special-method lookup returned a
+            # descriptor-backed wrapper this walker cannot soundly
+            # unwrap without executing its own `__get__` -- fail closed
+            # rather than classify the wrapper object itself as "the"
+            # effective callable.
+            verdict = IdentityVerdict(
+                None,
+                None,
+                "unresolved",
+                f"{method_name} is a descriptor-backed special method on "
+                f"{receiver_type.__module__}.{receiver_type.__qualname__}; the "
+                "real bound callable cannot be discovered without executing "
+                "its own __get__, which this walker never does",
+                False,
+            )
+            self.call_records.append(
+                CallRecord(site_label, callee_text, mechanism, verdict)
+            )
+            return
+
+        module, qualname = module_and_qualname(target)
+        verdict = classify_callable(target, module=module, qualname=qualname)
+        self.call_records.append(
+            CallRecord(site_label, callee_text, mechanism, verdict)
+        )
+        self._recurse_into_dispatch_target(
+            target,
+            verdict,
+            f"{site_label} -> {callee_text}()",
+            receiver_type,
+            always_follow_modules,
+        )
+
+    # -- Descriptors -----------------------------------------------------
+
+    def _unwrap_descriptor_target(
+        self, raw: object, dunder_name: str, host_class: type
+    ) -> tuple[object | None, type | None]:
+        """The real callable a descriptor dispatch actually runs, plus
+        the owner class its own ``self``/first parameter refers to --
+        resolved entirely through non-executing lookups (item 3).
+
+        An *exact* (never subclassed -- ``type(raw) is property``, not
+        ``isinstance``) builtin ``@property`` is unwrapped to its own
+        stored ``fget``/``fset``/``fdel`` function, since ``self`` inside
+        a property getter/setter/deleter is the *host* instance, not the
+        ``property`` object itself; reading ``.fget``/``.fset``/``.fdel``
+        via plain attribute access is safe here specifically because
+        ``property``'s own C-level getset-descriptors have no override
+        surface once the exact-type check holds -- a genuine subclass
+        could shadow them with an executing descriptor, so a ``property``
+        subclass deliberately falls through to the generic, fully-static
+        path below instead. A missing accessor (``fset``/``fdel`` is
+        ``None``) still dispatches to ``property``'s own
+        ``__set__``/``__delete__`` slot -- which unconditionally raises
+        -- never silently treated as "no dispatch occurs" (item 4).
+
+        Any other descriptor is a plain class defining
+        ``__get__``/``__set__``/``__delete__``, resolved via
+        `_static_get` on its own type -- ``self`` there is the
+        descriptor instance itself."""
+        if type(raw) is property:
+            accessor = {
+                "__get__": raw.fget,
+                "__set__": raw.fset,
+                "__delete__": raw.fdel,
+            }[dunder_name]
+            if accessor is not None:
+                return accessor, host_class
+            fallback = _static_get(property, dunder_name)
+            return (fallback if fallback is not _MISSING else None), property
+        desc_type = type(raw)
+        target = _static_get(desc_type, dunder_name)
+        return (target if target is not _MISSING else None), desc_type
+
+    def _descriptor_outcome_for_instance(
+        self, receiver_class: type, attr_name: str, dunder_name: str
+    ) -> _DescriptorOutcome:
+        """Correction item 6: if ``receiver_class`` overrides the base
+        attribute-access machinery this operation depends on
+        (``__getattribute__``/``__setattr__``/``__delattr__``), the
+        ordinary descriptor-lookup algorithm below is not proven to be
+        what actually runs -- downgraded to ``ambiguous`` regardless of
+        what that algorithm would otherwise conclude, carrying whatever
+        candidate target it found (if any) so a forced recursion can
+        still discover a nested forbidden call, without ever claiming
+        the site itself is resolved-safe. The override is looked up via
+        ``_static_get``/identity comparison only -- never executed."""
+        outcome = self._descriptor_outcome_for_instance_assuming_default_protocol(
+            receiver_class, attr_name, dunder_name
+        )
+        override_dunder = _ATTRIBUTE_ACCESS_OVERRIDE_DUNDER[dunder_name]
+        if _overrides_base_dunder(receiver_class, override_dunder, object):
+            return _DescriptorOutcome(
+                "ambiguous",
+                outcome.target,
+                outcome.target_owner,
+                f"{receiver_class.__module__}.{receiver_class.__qualname__} "
+                f"overrides {override_dunder}; the ordinary descriptor-dispatch "
+                "path is not proven to be what actually runs, so this cannot be "
+                "classified resolved-safe",
+            )
+        return outcome
+
+    def _descriptor_outcome_for_instance_assuming_default_protocol(
+        self, receiver_class: type, attr_name: str, dunder_name: str
+    ) -> _DescriptorOutcome:
+        """Models ``object.__getattribute__``/``__setattr__``/
+        ``__delattr__``'s own real algorithm for an *instance* of
+        ``receiver_class`` -- never a guess (item 4). Assumes
+        ``receiver_class`` does not override that base machinery; its
+        caller (`_descriptor_outcome_for_instance`) is the one place
+        that assumption is checked (item 6)."""
+        raw = _static_get(receiver_class, attr_name)
+        if raw is _MISSING:
+            return _DescriptorOutcome("no_dispatch")
+
+        if dunder_name == "__get__":
+            if not _static_implements(raw, "__get__"):
+                return _DescriptorOutcome("no_dispatch")
+            if not _static_is_data_descriptor(raw):
+                # A non-data descriptor (e.g. an ordinary method) found
+                # on the class -- a real instance's own __dict__ could
+                # shadow it on Load, and this walker has no live
+                # instance to check. Never classify this as safe or as
+                # "no dispatch": fail closed as an explicit ambiguity,
+                # while still surfacing whatever the candidate target
+                # itself would reveal (item 4/§6).
+                target, owner = self._unwrap_descriptor_target(
+                    raw, dunder_name, receiver_class
+                )
+                return _DescriptorOutcome(
+                    "ambiguous",
+                    target,
+                    owner,
+                    "non-data descriptor: an instance's own __dict__ could "
+                    "shadow it on Load, which cannot be proven absent "
+                    "statically",
+                )
+            target, owner = self._unwrap_descriptor_target(
+                raw, dunder_name, receiver_class
+            )
+            if target is None:
+                return _DescriptorOutcome("no_dispatch")
+            return _DescriptorOutcome("resolved", target, owner)
+
+        # Store/Del: unambiguous either way -- assignment/deletion
+        # dispatch if and only if a *data* descriptor for this exact
+        # operation is present on the class; otherwise they always
+        # write/delete directly in the instance's own __dict__,
+        # bypassing any non-data descriptor entirely. No
+        # instance-dict-shadow ambiguity is possible for Store/Del.
+        if not _static_implements(raw, dunder_name):
+            return _DescriptorOutcome("no_dispatch")
+        target, owner = self._unwrap_descriptor_target(raw, dunder_name, receiver_class)
+        if target is None:
+            return _DescriptorOutcome("no_dispatch")
+        return _DescriptorOutcome("resolved", target, owner)
+
+    def _descriptor_outcome_for_class(
+        self, receiver_class: type, attr_name: str, dunder_name: str
+    ) -> _DescriptorOutcome:
+        """Correction item 6: if the *metaclass* overrides the base
+        class-level attribute-access machinery this operation depends
+        on (``type.__getattribute__``/``__setattr__``/``__delattr__``),
+        the ordinary algorithm below is not proven to run -- same
+        ambiguous-downgrade discipline as the instance path, checked
+        against ``type`` rather than ``object``.
+
+        Checked, and short-circuited on, *before* the assumed-default
+        algorithm ever runs -- never after. ``receiver_class`` here is
+        itself an instance of the (possibly hostile) metaclass, so any
+        plain attribute access performed *on* ``receiver_class`` --
+        including ``inspect.getattr_static``'s own internal MRO walk,
+        empirically observed to read ``entry.__dict__`` for each MRO
+        member -- genuinely dispatches through that metaclass's own
+        ``__getattribute__`` if it overrides one (a real
+        ``inspect.getattr_static`` limitation: its guarantee is about
+        never triggering the looked-up *attribute's* descriptor
+        protocol, not about the *receiver class object's* own
+        attribute-access machinery). Computing the assumed-default
+        outcome first and only checking the override afterward would
+        already have executed the override by the time this method
+        could react -- so no candidate target is attempted at all here
+        (item 6's own target discovery is explicitly optional); this is
+        the one place in this module where "never execute the override"
+        requires *not calling* ``_static_get`` on ``receiver_class``,
+        rather than calling it and merely discounting the result."""
+        override_dunder = _ATTRIBUTE_ACCESS_OVERRIDE_DUNDER[dunder_name]
+        metatype = type(receiver_class)
+        if _overrides_base_dunder(metatype, override_dunder, type):
+            # The rationale below deliberately never reads any attribute
+            # off `receiver_class` itself (not even `__qualname__`) --
+            # `metatype`'s own attributes are safe (its type is plain
+            # `type`, unmodified), but `receiver_class` is an instance
+            # of the hostile metaclass, so even `receiver_class.
+            # __qualname__` would dispatch through the very override
+            # this branch exists to never execute.
+            return _DescriptorOutcome(
+                "ambiguous",
+                None,
+                None,
+                f"{metatype.__module__}.{metatype.__qualname__} (the metaclass "
+                f"of the receiver class) overrides {override_dunder}; the "
+                "ordinary class-level descriptor-dispatch path is not proven "
+                "to be what actually runs, so this cannot be classified "
+                "resolved-safe, and no candidate target is attempted since "
+                "even a static lookup on the class itself is not safe here",
+            )
+        return self._descriptor_outcome_for_class_assuming_default_protocol(
+            receiver_class, attr_name, dunder_name
+        )
+
+    def _descriptor_outcome_for_class_assuming_default_protocol(
+        self, receiver_class: type, attr_name: str, dunder_name: str
+    ) -> _DescriptorOutcome:
+        """``C.attr`` -- the receiver expression itself names a live
+        class, not an instance. Never silently excluded merely because
+        the receiver is a class (item 4). Assumes the metaclass does
+        not override the base class-level attribute-access machinery;
+        its caller (`_descriptor_outcome_for_class`) is the one place
+        that assumption is checked (item 6).
+
+        Correction item 4: ``Load`` (``C.attr``) and ``Store``/``Del``
+        (``C.attr = value`` / ``del C.attr``) run through genuinely
+        different real machinery and must not share one algorithm.
+
+        ``C.attr`` models ``type.__getattribute__``: a metaclass-level
+        *data* descriptor takes priority over anything found on the
+        class itself; otherwise the class's own MRO is checked
+        (dispatching through a descriptor found there too -- accessing a
+        descriptor via the class it is defined on still invokes its own
+        ``__get__``), falling back to a non-data metaclass attribute
+        last.
+
+        ``C.attr = value`` / ``del C.attr`` model
+        ``type.__setattr__``/``type.__delattr__``: **only** a data
+        descriptor found on the *metaclass* can intercept them. A
+        descriptor merely stored in ``C.__dict__`` (``cls_raw`` below)
+        is never consulted for Store/Del -- assignment/deletion writes
+        or deletes ``C.__dict__[attr_name]`` directly, discarding
+        whatever object was there, exactly as it would for a plain,
+        non-descriptor value. Consulting ``cls_raw`` for these two
+        operations (as a class-body descriptor is correctly consulted
+        for ``Load``) would misreport dispatch into a descriptor that
+        real ``type.__setattr__``/``__delattr__`` never actually
+        invokes."""
+        metatype = type(receiver_class)
+        meta_raw = _static_get(metatype, attr_name)
+
+        if dunder_name != "__get__":
+            if meta_raw is not _MISSING and _static_implements(meta_raw, dunder_name):
+                target, owner = self._unwrap_descriptor_target(
+                    meta_raw, dunder_name, metatype
+                )
+                return (
+                    _DescriptorOutcome("resolved", target, owner)
+                    if target is not None
+                    else _DescriptorOutcome("no_dispatch")
+                )
+            return _DescriptorOutcome("no_dispatch")
+
+        if meta_raw is not _MISSING and _static_is_data_descriptor(meta_raw):
+            target, owner = self._unwrap_descriptor_target(
+                meta_raw, dunder_name, metatype
+            )
+            return (
+                _DescriptorOutcome("resolved", target, owner)
+                if target is not None
+                else _DescriptorOutcome("no_dispatch")
+            )
+
+        cls_raw = _static_get(receiver_class, attr_name)
+        if cls_raw is not _MISSING:
+            if not _static_implements(cls_raw, "__get__"):
+                return _DescriptorOutcome("no_dispatch")
+            target, owner = self._unwrap_descriptor_target(
+                cls_raw, dunder_name, receiver_class
+            )
+            return (
+                _DescriptorOutcome("resolved", target, owner)
+                if target is not None
+                else _DescriptorOutcome("no_dispatch")
+            )
+
+        if meta_raw is not _MISSING:
+            if not _static_implements(meta_raw, dunder_name):
+                return _DescriptorOutcome("no_dispatch")
+            target, owner = self._unwrap_descriptor_target(
+                meta_raw, dunder_name, metatype
+            )
+            return (
+                _DescriptorOutcome("resolved", target, owner)
+                if target is not None
+                else _DescriptorOutcome("no_dispatch")
+            )
+
+        return _DescriptorOutcome("no_dispatch")
+
+    def _resolve_descriptor_receiver(
+        self,
+        expr: ast.expr,
+        g: dict[str, object],
+        loc: dict[str, object],
+        owner_class: type | None,
+        param_hints: dict[str, type],
+        local_var_types: dict[str, type],
+    ) -> tuple[str, type] | None:
+        """``("instance", cls)`` when ``expr`` names a value statically
+        known to be an *instance* of ``cls``; ``("class", cls)`` when
+        ``expr`` names the live class object ``cls`` itself (item 4 --
+        never silently excluded merely for being a class); ``None`` when
+        the receiver cannot be soundly resolved either way (§6
+        fail-closed). Module attribute access is excluded entirely and
+        separately, by the caller, before this is reached. ``expr`` is
+        always a bare `ast.Name` at every call site in this module (the
+        single-hop scope bound) -- resolving it via `loc`/`g` is a plain
+        dict lookup, never an attribute access, so this is exactly as
+        non-executing as the `_infer_type` call below."""
+        inferred = self._infer_type(
+            expr, g, loc, owner_class, param_hints, local_var_types
+        )
+        if inferred is not None:
+            return "instance", inferred
+        live = self._resolve_object_chain(expr, g, loc)
+        if inspect.isclass(live):
+            return "class", live
+        return None
+
+    def _is_module_receiver(
+        self, expr: ast.expr, g: dict[str, object], loc: dict[str, object]
+    ) -> bool:
+        """Module attribute access is a plain namespace dict lookup, not
+        the class/instance descriptor protocol -- a sound exclusion, not
+        an uncertain one.
+
+        Correction item 6: ``type(value) is types.ModuleType``, never
+        ``isinstance(value, types.ModuleType)`` -- ``isinstance`` reads
+        an object's ``__class__`` as a fallback (to support proxy
+        objects), which for a receiver that is itself a *class* with a
+        hostile metaclass ``__getattribute__`` genuinely executes that
+        override (observed directly: ``HostMetaGetattribute.__class__``
+        dispatches through ``_MetaGetattribute.__getattribute__``). A
+        plain ``type()`` reads only the C-level type slot and never
+        invokes any Python-level attribute-access machinery."""
+        return type(self._resolve_object_chain(expr, g, loc)) is types.ModuleType
+
+    def _record_unresolved_descriptor_candidate(
+        self, dunder_name: str, callee_text: str, site_label: str, rationale: str
+    ) -> None:
+        """One explicit, fail-closed ``unresolved`` implicit-dispatch
+        candidate -- for a site whose receiver this walker's static
+        resolution cannot soundly reach at all (item 5's chained-
+        receiver residual), never a silent drop. Never claims a target
+        was found (``verdict.qualname`` stays ``None``) -- there is
+        nothing to unwrap when the receiver itself is unresolved."""
+        mechanism = f"implicit-descriptor-{dunder_name}"
+        verdict = IdentityVerdict(None, None, "unresolved", rationale, False)
+        self.call_records.append(
+            CallRecord(site_label, callee_text, mechanism, verdict)
+        )
+
+    def _evaluate_descriptor_dispatch(
+        self,
+        receiver_expr: ast.expr,
+        attr_name: str,
+        dunder_name: str,
+        callee_text: str,
+        site_label: str,
+        g: dict[str, object],
+        loc: dict[str, object],
+        owner_class: type | None,
+        param_hints: dict[str, type],
+        local_var_types: dict[str, type],
+        always_follow_modules: frozenset[str],
+    ) -> None:
+        """Shared body for a bare ``ast.Attribute`` site (§2's "sharpest
+        instance") and one half of an ``ast.AugAssign`` attribute
+        target -- both are one candidate descriptor dispatch, evaluated
+        identically. Does **not** itself increment
+        ``implicit_syntax_sites_total`` -- an ``ast.AugAssign`` target
+        calls this twice (``__get__`` then ``__set__``) for what is
+        still exactly *one* syntax site (`docs/prompts/task-38.8.md`
+        §4/§8's "syntax site" vs. "dispatch candidate" distinction), so
+        the syntax-site count is each caller's own responsibility,
+        incremented exactly once per AST site regardless of how many
+        candidate dunders that site evaluates."""
+        mechanism = f"implicit-descriptor-{dunder_name}"
+
+        if self._is_module_receiver(receiver_expr, g, loc):
+            self.implicit_resolved_non_descriptor_exclusion_total += 1
+            return
+
+        receiver = self._resolve_descriptor_receiver(
+            receiver_expr, g, loc, owner_class, param_hints, local_var_types
+        )
+        if receiver is None:
+            verdict = IdentityVerdict(
+                None,
+                None,
+                "unresolved",
+                "implicit descriptor receiver type not soundly resolved",
+                False,
+            )
+            self.call_records.append(
+                CallRecord(site_label, callee_text, mechanism, verdict)
+            )
+            return
+
+        kind, receiver_class = receiver
+        outcome = (
+            self._descriptor_outcome_for_instance(
+                receiver_class, attr_name, dunder_name
+            )
+            if kind == "instance"
+            else self._descriptor_outcome_for_class(
+                receiver_class, attr_name, dunder_name
+            )
+        )
+
+        if outcome.kind == "no_dispatch":
+            # The receiver and attribute are both soundly resolved, and
+            # that attribute's own type definitively does not implement
+            # this context's dunder -- no dispatch occurs here at all.
+            self.implicit_resolved_non_descriptor_exclusion_total += 1
+            return
+
+        if outcome.kind == "ambiguous":
+            verdict = IdentityVerdict(
+                None, None, "unresolved", outcome.rationale, False
+            )
+            self.call_records.append(
+                CallRecord(site_label, callee_text, mechanism, verdict)
+            )
+            if outcome.target is not None:
+                # The site's own dispatch is uncertain (never claimed
+                # resolved-safe above) -- but a forbidden call reachable
+                # through the candidate target is still worth
+                # discovering, so recursion is forced regardless of this
+                # site's own unresolved verdict.
+                self._recurse_into_dispatch_target(
+                    outcome.target,
+                    verdict,
+                    f"{site_label} -> {callee_text}",
+                    outcome.target_owner,
+                    always_follow_modules,
+                    force=True,
+                )
+            return
+
+        assert outcome.kind == "resolved" and outcome.target is not None
+        module, qualname = module_and_qualname(outcome.target)
+        verdict = classify_callable(outcome.target, module=module, qualname=qualname)
+        self.call_records.append(
+            CallRecord(site_label, callee_text, mechanism, verdict)
+        )
+        self._recurse_into_dispatch_target(
+            outcome.target,
+            verdict,
+            f"{site_label} -> {callee_text}",
+            outcome.target_owner,
+            always_follow_modules,
+        )
+
+    def _handle_implicit_descriptor_attribute(
+        self,
+        node: ast.Attribute,
+        site_label: str,
+        g: dict[str, object],
+        loc: dict[str, object],
+        owner_class: type | None,
+        param_hints: dict[str, type],
+        local_var_types: dict[str, type],
+        always_follow_modules: frozenset[str],
+    ) -> None:
+        """A bare ``ast.Attribute`` read/write/delete -- M-8's own
+        "sharpest instance", carrying zero ``ast.Call`` node of any kind
+        (`docs/prompts/task-38.8.md` §2). One node is one syntax site,
+        counted exactly once regardless of outcome.
+
+        Soundly resolved only for a single-hop ``Name`` receiver
+        (``obj.attr``, including ``self.attr``) -- the exact shape every
+        Task 38.8 descriptor fixture characterizes. A deeper chain
+        (``self.foo.bar``) is a real, named residual (item 5): never
+        silently dropped -- an explicit, fail-closed unresolved
+        implicit-dispatch record is emitted instead, since this
+        walker's single-hop receiver resolution does not extend to it."""
+        dunder_name = _DESCRIPTOR_CONTEXT_DUNDER.get(type(node.ctx))
+        if dunder_name is None:
+            return
+        self.implicit_syntax_sites_total += 1
+        callee_text = f"{ast.unparse(node)} [{dunder_name}]"
+        if not isinstance(node.value, ast.Name):
+            self._record_unresolved_descriptor_candidate(
+                dunder_name, callee_text, site_label, _CHAINED_RECEIVER_RATIONALE
+            )
+            return
+        self._evaluate_descriptor_dispatch(
+            node.value,
+            node.attr,
+            dunder_name,
+            callee_text,
+            site_label,
+            g,
+            loc,
+            owner_class,
+            param_hints,
+            local_var_types,
+            always_follow_modules,
+        )
+
+    def _handle_implicit_augassign_attribute(
+        self,
+        node: ast.AugAssign,
+        site_label: str,
+        g: dict[str, object],
+        loc: dict[str, object],
+        owner_class: type | None,
+        param_hints: dict[str, type],
+        local_var_types: dict[str, type],
+        always_follow_modules: frozenset[str],
+    ) -> None:
+        """``obj.attr += value`` reads *and* writes -- CPython desugars
+        this to a `__get__` dispatch to obtain the current value,
+        followed by a `__set__` dispatch to store the computed result
+        (item 5). The AST target's own context is `Store`, which would
+        otherwise misclassify this as a `__set__`-only site -- handled
+        here, specially, before the generic bare-`ast.Attribute` path
+        ever sees this same node (see its caller's skip-set). One
+        ``ast.AugAssign`` node is one syntax site with *two* dispatch
+        candidates (`__get__` then `__set__`) -- the site is counted
+        exactly once here, never once per candidate."""
+        target = node.target
+        if not isinstance(target, ast.Attribute):
+            return
+        self.implicit_syntax_sites_total += 1
+        base_text = ast.unparse(target)
+        if not isinstance(target.value, ast.Name):
+            for dunder_name in ("__get__", "__set__"):
+                self._record_unresolved_descriptor_candidate(
+                    dunder_name,
+                    f"{base_text} [{dunder_name}] (augmented assignment)",
+                    site_label,
+                    _CHAINED_RECEIVER_RATIONALE,
+                )
+            return
+        for dunder_name in ("__get__", "__set__"):
+            self._evaluate_descriptor_dispatch(
+                target.value,
+                target.attr,
+                dunder_name,
+                f"{base_text} [{dunder_name}] (augmented assignment)",
+                site_label,
+                g,
+                loc,
+                owner_class,
+                param_hints,
+                local_var_types,
+                always_follow_modules,
+            )
+
     def walk(
         self,
         func: object,
@@ -1269,7 +2160,73 @@ class StaticWalker:
         local_helper_names = _local_helper_names(tree)
         first_param_name = code.co_varnames[0] if code and code.co_argcount else None
 
-        for node in _shallow_descendants(tree):
+        descendants = _shallow_descendants(tree)
+        # Task 38.8 Phase A.1 correction (item 5): an `ast.Attribute`
+        # that is itself a Call's own `.func` (`obj.method(...)`) used
+        # to be excluded here on the theory that the existing,
+        # separately-tested call-resolution path already "owns" it --
+        # that reasoning conflated two distinct events: the attribute
+        # *load* (does reading `obj.method` invoke a descriptor's
+        # `__get__`?) and the outer *call* (what does the resulting
+        # object do when called?). The call-resolution path only ever
+        # classifies the latter; the former was a silent blind spot
+        # (`docs/prompts/task-38.8.md` §6's "do not silently omit a
+        # descriptor site"), so it is no longer excluded -- the same
+        # `_handle_implicit_descriptor_attribute` path below now
+        # evaluates it too, producing its own, independent CallRecord
+        # alongside the outer call's, never in place of it and never
+        # merged with it (§11: distinct events, no double-counting).
+        # An `ast.AugAssign` target attribute (`obj.attr += value`) is
+        # still handled specially, as one `__get__` *and* one `__set__`
+        # event (item 5) -- excluded here so the generic bare-Attribute
+        # path below never double-processes it as a plain `__set__`.
+        implicit_descriptor_skip_ids = {
+            id(n.target)
+            for n in descendants
+            if isinstance(n, ast.AugAssign) and isinstance(n.target, ast.Attribute)
+        }
+
+        for node in descendants:
+            if isinstance(node, (ast.With, ast.AsyncWith)):
+                self._handle_with_statement(
+                    node,
+                    site_label,
+                    g,
+                    loc,
+                    owner_class,
+                    param_hints,
+                    local_var_types,
+                    always_follow_modules,
+                )
+                continue
+
+            if isinstance(node, ast.AugAssign):
+                self._handle_implicit_augassign_attribute(
+                    node,
+                    site_label,
+                    g,
+                    loc,
+                    owner_class,
+                    param_hints,
+                    local_var_types,
+                    always_follow_modules,
+                )
+                continue
+
+            if isinstance(node, ast.Attribute):
+                if id(node) not in implicit_descriptor_skip_ids:
+                    self._handle_implicit_descriptor_attribute(
+                        node,
+                        site_label,
+                        g,
+                        loc,
+                        owner_class,
+                        param_hints,
+                        local_var_types,
+                        always_follow_modules,
+                    )
+                continue
+
             if not isinstance(node, ast.Call):
                 continue
 
@@ -1502,6 +2459,27 @@ class StaticWalker:
         return node_records
 
 
+#: The dispatch methods the mechanized architecture (ADR-032 Option D)
+#: enumerates per-site, grouped by family -- the exact set
+#: `resolution_mechanism` is tagged with (`implicit-context-manager-<m>`/
+#: `implicit-descriptor-<m>`), reused here so the report's per-method
+#: breakdown (§8, item 2) and the walker's own tagging can never drift
+#: apart into two separate lists.
+_CONTEXT_MANAGER_DISPATCH_METHODS: tuple[str, ...] = (
+    *_SYNC_CONTEXT_MANAGER_METHODS,
+    *_ASYNC_CONTEXT_MANAGER_METHODS,
+)
+_DESCRIPTOR_DISPATCH_METHODS: tuple[str, ...] = tuple(
+    sorted(set(_DESCRIPTOR_CONTEXT_DUNDER.values()))
+)
+
+
+def _implicit_dispatch_mechanism_for(method: str) -> str:
+    if method in _CONTEXT_MANAGER_DISPATCH_METHODS:
+        return f"implicit-context-manager-{method}"
+    return f"implicit-descriptor-{method}"
+
+
 @dataclass(frozen=True, slots=True)
 class TraceResult:
     roots_traced: int
@@ -1513,14 +2491,118 @@ class TraceResult:
     nodes: tuple[NodeRecord, ...]
     calls: tuple[CallRecord, ...]
     sites_without_source: tuple[str, ...]
+    #: Task 38.8 Phase A.1 (§4/§8): one implicit-dispatch *syntax site*
+    #: -- one `with`/`async with` item, or one candidate attribute
+    #: operation -- counted regardless of outcome. Not derivable from
+    #: `calls` alone (a `resolved_non_descriptor_exclusion` site
+    #: produces no `CallRecord` at all).
+    implicit_syntax_sites_total: int = 0
+    #: A descriptor-family site soundly proven to dispatch nothing at
+    #: all (ADR-032's `resolved_non_descriptor_exclusion`) -- excluded
+    #: from the `resolved`/`unresolved` partition entirely, same reason.
+    implicit_resolved_non_descriptor_exclusion_total: int = 0
 
     @property
     def nodes_unresolved(self) -> int:
         return sum(1 for n in self.nodes if n.unresolved)
 
     @property
+    def explicit_calls(self) -> tuple[CallRecord, ...]:
+        """``self.calls`` minus every Task 38.8 implicit-dispatch record
+        (``resolution_mechanism`` tagged ``implicit-*``) -- the
+        population every pre-38.8 legacy aggregate (``calls_total``,
+        ``calls_unresolved``, the per-category identity-resolution
+        counts, the unresolved detail/multiplicity fields) must be
+        computed over. `docs/prompts/task-38.8.md` §8's own explicit
+        clarification is that ``nodes_unresolved``/``calls_unresolved``
+        remain **explicit-call-only** unless a future, deliberately
+        versioned schema change says otherwise -- this property is the
+        one place that boundary is enforced, so no caller has to
+        remember to filter it out by hand."""
+        return tuple(
+            c for c in self.calls if not c.resolution_mechanism.startswith("implicit-")
+        )
+
+    @property
     def calls_unresolved(self) -> int:
-        return sum(1 for c in self.calls if c.verdict.category == "unresolved")
+        return sum(1 for c in self.explicit_calls if c.verdict.category == "unresolved")
+
+    # -- Task 38.8 §8: mechanized-architecture implicit-dispatch fields --
+
+    @property
+    def implicit_dispatch_candidates_total(self) -> int:
+        """One `CallRecord` per enumerated candidate dispatch (resolved,
+        unresolved, or ambiguous-hence-unresolved) -- every
+        `resolution_mechanism` this walker tags `implicit-*`. Excludes
+        `resolved_non_descriptor_exclusion` sites, which produce no
+        `CallRecord` at all (ADR-032's own partition)."""
+        return sum(
+            1 for c in self.calls if c.resolution_mechanism.startswith("implicit-")
+        )
+
+    @property
+    def implicit_dispatch_resolved(self) -> int:
+        return sum(
+            1
+            for c in self.calls
+            if c.resolution_mechanism.startswith("implicit-")
+            and c.verdict.category != "unresolved"
+        )
+
+    @property
+    def implicit_dispatch_unresolved(self) -> int:
+        return sum(
+            1
+            for c in self.calls
+            if c.resolution_mechanism.startswith("implicit-")
+            and c.verdict.category == "unresolved"
+        )
+
+    @property
+    def implicit_dispatch_explicit_path_duplicates(self) -> int:
+        """A resolved (or unresolved-but-identified) implicit-dispatch
+        target whose exact (module, qualname) identity is *also*
+        independently reached via an ordinary, explicit `ast.Call` node
+        elsewhere in this same trace (§1's fourth category) -- an
+        annotation on an already-counted site, per §11, never a fifth
+        addend folded into the resolved/unresolved partition."""
+        explicit_identities = {
+            (c.verdict.module, c.verdict.qualname)
+            for c in self.calls
+            if not c.resolution_mechanism.startswith("implicit-")
+            and c.verdict.qualname is not None
+        }
+        return sum(
+            1
+            for c in self.calls
+            if c.resolution_mechanism.startswith("implicit-")
+            and c.verdict.qualname is not None
+            and (c.verdict.module, c.verdict.qualname) in explicit_identities
+        )
+
+    @property
+    def implicit_dispatch_by_method(self) -> dict[str, dict[str, int]]:
+        """Per-dunder breakdown -- context-manager enter/exit/aenter/
+        aexit and descriptor get/set/delete each counted independently
+        (item 2), never collapsed into one family-level figure. Keys
+        are a fixed, deterministic, sorted-within-family order."""
+        out: dict[str, dict[str, int]] = {}
+        for method in (
+            *_CONTEXT_MANAGER_DISPATCH_METHODS,
+            *_DESCRIPTOR_DISPATCH_METHODS,
+        ):
+            mechanism = _implicit_dispatch_mechanism_for(method)
+            matching = [c for c in self.calls if c.resolution_mechanism == mechanism]
+            out[method] = {
+                "candidates": len(matching),
+                "resolved": sum(
+                    1 for c in matching if c.verdict.category != "unresolved"
+                ),
+                "unresolved": sum(
+                    1 for c in matching if c.verdict.category == "unresolved"
+                ),
+            }
+        return out
 
 
 _MECHANISM_MODULES = frozenset(
@@ -1870,4 +2952,8 @@ def run_trace(*, max_total_walk_steps: int = _MAX_TOTAL_WALK_STEPS) -> TraceResu
             )
         ),
         sites_without_source=tuple(sorted(set(walker.sites_without_source))),
+        implicit_syntax_sites_total=walker.implicit_syntax_sites_total,
+        implicit_resolved_non_descriptor_exclusion_total=(
+            walker.implicit_resolved_non_descriptor_exclusion_total
+        ),
     )

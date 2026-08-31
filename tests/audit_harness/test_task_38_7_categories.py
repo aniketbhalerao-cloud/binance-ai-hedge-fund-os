@@ -478,6 +478,17 @@ def test_termination_tiny_injected_budget_reports_and_blocks_exit_code() -> None
         },
         runtime_denial={"success": True},
         negative_controls={"total": 5, "detected": 5, "detail": []},
+        implicit_dispatch={
+            "mechanized_protocol_families": ["context_manager", "descriptor"],
+            "unsupported_protocol_families": [],
+            "syntax_sites_total": 0,
+            "dispatch_candidates_total": 0,
+            "resolved_dispatches": 0,
+            "unresolved_dispatches": 0,
+            "resolved_non_descriptor_exclusion": 0,
+            "explicit_path_duplicates": 0,
+            "dispatch_events_by_method": {},
+        },
     )
     assert built.data["exit_code"] == 1
     assert len(built.data["roots_with_error"]) > 0
