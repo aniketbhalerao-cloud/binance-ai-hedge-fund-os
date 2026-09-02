@@ -82,7 +82,18 @@ PROJECT_TOP_LEVEL_PACKAGES: frozenset[str] = frozenset(
 #: two ADR-032 Phase 0 authorizations recorded 2026-08-22
 #: (Aniket Bhalerao -- project owner/reviewer). builtins.str.upper was
 #: NOT added -- explicitly deferred, per that same ADR-032 entry.
-EXACT_IDENTITY_POLICY_VERSION = "2026-08-22.1"
+#: 2026-09-02.1 (Task 38.10 Phase A): the nine exact callable-SLOT
+#: identities ADR-032's "Task 38.10 Phase 0" section authorizes
+#: (2026-09-02, Aniket Bhalerao -- project owner/reviewer) added,
+#: each individually rationalized from that section's own per-slot
+#: Phase 0.2 characterization evidence on CPython 3.12.13. Nothing
+#: else is added: the 13 callback-boundary-deferred identities, the
+#: 2 deeper-review-deferred, the 1 rejected (builtins.type.__new__),
+#: the 3 evidence-safe-but-not-authorized (builtins.OSError.__init__,
+#: builtins.bytearray.__new__, collections.deque.__new__), Family E
+#: (_io.StringIO/_io.TextIOWrapper), and every corresponding
+#: TYPE-level identity all remain absent by that same authorization.
+EXACT_IDENTITY_POLICY_VERSION = "2026-09-02.1"
 
 #: module.qualname -> per-entry safety rationale. Every entry is a
 #: single, individually reviewed, exact identity -- never a pattern.
@@ -356,6 +367,120 @@ EXACT_IDENTITY_POLICY: dict[str, str] = {
         "Requirement 6) since it is the entrypoint the runtime denial check "
         "patches -- this entry covers only this node's own constructor body, "
         "which performs no I/O of its own."
+    ),
+    # ADR-032 "Task 38.10 Phase 0 -- exact-identity authorization (9
+    # identities)", 2026-09-02, accepting reviewer Aniket Bhalerao
+    # (project owner/reviewer). Each of the nine is a per-SLOT identity
+    # characterized individually on CPython 3.12.13 (the interpreter of
+    # record, `pyproject.toml` requires-python "==3.12.*") against a
+    # marker probe exposing __iter__/__next__/__index__/__int__/
+    # __trunc__/__bytes__/__buffer__/__str__/__repr__/__len__/
+    # __getitem__/keys/__call__/__hash__/__eq__; none fired on any of
+    # these nine slots. The authorization covers the named slot only --
+    # never the corresponding type object, which runs both slots plus
+    # whatever the type's own construction protocol dispatches, and
+    # which therefore remains `unresolved`.
+    "_thread.RLock.__new__": (
+        "CPython stdlib synchronization primitive allocation slot: allocates a "
+        "recursive lock and nothing else. No construction-time user-overridable "
+        "protocol dispatch (marker probe fired nothing); creates and starts no "
+        "thread (`_thread._count()` measured 0 -> 0 across 50 constructions); no "
+        "file/network/process I/O; accepts no caller-supplied callable; mutates "
+        "nothing beyond the object it allocates. Slot only -- the `_thread.RLock` "
+        "type identity is NOT authorized. ADR-032 Task 38.10 Phase 0 authorization "
+        "(2026-09-02, Aniket Bhalerao -- project owner/reviewer), recorded prior to "
+        "this entry per Task 38.7's Two-Phase Provenance."
+    ),
+    "builtins.AssertionError.__new__": (
+        "CPython stdlib builtin exception allocation slot: allocates the exception "
+        "and stores the *args tuple verbatim. No construction-time user-overridable "
+        "protocol dispatch on any argument, in either the one- or multi-argument "
+        "form; no I/O; no caller-supplied callable invoked. Unlike the inherited "
+        "`builtins.Exception.__new__` entry above, `AssertionError` carries its own "
+        "C-level slot, which is why it needs its own reviewed identity. Slot only -- "
+        "the `builtins.AssertionError` type identity is NOT authorized. ADR-032 Task "
+        "38.10 Phase 0 authorization (2026-09-02, Aniket Bhalerao -- project owner/"
+        "reviewer), recorded prior to this entry per Two-Phase Provenance."
+    ),
+    "builtins.AssertionError.__init__": (
+        "CPython stdlib builtin exception: stores the *args tuple on the instance "
+        "and does nothing else -- the same operational boundary as the existing "
+        "`builtins.BaseException.__init__`/`builtins.Exception.__init__` entries, "
+        "established here by direct per-slot evidence rather than inherited from "
+        "them. No construction-time protocol dispatch, no I/O, no caller-supplied "
+        "callable invoked. Slot only -- the type identity is NOT authorized. "
+        "ADR-032 Task 38.10 Phase 0 authorization (2026-09-02, Aniket Bhalerao -- "
+        "project owner/reviewer), recorded prior to this entry."
+    ),
+    "builtins.AttributeError.__init__": (
+        "CPython stdlib builtin exception: stores the *args tuple plus the "
+        "`name=`/`obj=` keywords verbatim on the instance. Characterized "
+        "specifically for those keywords: passing a probe object as `name=` fired "
+        "no `__str__`, `__repr__` or `__iter__` at construction -- AttributeError's "
+        "later suggestion/formatting machinery is outside this slot and is NOT "
+        "authorized by this entry. No I/O, no caller-supplied callable invoked. "
+        "Slot only -- the type identity is NOT authorized. ADR-032 Task 38.10 "
+        "Phase 0 authorization (2026-09-02, Aniket Bhalerao -- project owner/"
+        "reviewer), recorded prior to this entry."
+    ),
+    "builtins.NotImplementedError.__new__": (
+        "CPython stdlib builtin exception allocation slot: allocates the exception "
+        "and stores the *args tuple verbatim; `NotImplementedError` carries its own "
+        "C-level slot rather than inheriting `builtins.RuntimeError.__new__`. No "
+        "construction-time user-overridable protocol dispatch, no I/O, no "
+        "caller-supplied callable invoked. Slot only -- the type identity is NOT "
+        "authorized. ADR-032 Task 38.10 Phase 0 authorization (2026-09-02, Aniket "
+        "Bhalerao -- project owner/reviewer), recorded prior to this entry."
+    ),
+    "builtins.NotImplementedError.__init__": (
+        "CPython stdlib builtin exception: stores the *args tuple on the instance, "
+        "the same operational boundary as the existing "
+        "`builtins.RuntimeError.__init__` entry above, established here by direct "
+        "per-slot evidence rather than inherited from it. No construction-time "
+        "protocol dispatch, no I/O, no caller-supplied callable invoked. Slot only "
+        "-- the type identity is NOT authorized. ADR-032 Task 38.10 Phase 0 "
+        "authorization (2026-09-02, Aniket Bhalerao -- project owner/reviewer), "
+        "recorded prior to this entry."
+    ),
+    "builtins.OverflowError.__new__": (
+        "CPython stdlib builtin exception allocation slot: allocates the exception "
+        "and stores the *args tuple verbatim; `OverflowError` carries its own "
+        "C-level slot rather than inheriting `builtins.ArithmeticError`'s. Despite "
+        "being an arithmetic-family exception, its construction performs no numeric "
+        "coercion whatever -- no `__int__`/`__index__`/`__trunc__` fired on a probe "
+        "argument. No I/O, no caller-supplied callable invoked. Slot only -- the "
+        "type identity is NOT authorized. ADR-032 Task 38.10 Phase 0 authorization "
+        "(2026-09-02, Aniket Bhalerao -- project owner/reviewer), recorded prior to "
+        "this entry."
+    ),
+    "builtins.OverflowError.__init__": (
+        "CPython stdlib builtin exception: stores the *args tuple on the instance "
+        "and performs no numeric coercion on any argument (no `__int__`/`__index__`/"
+        "`__trunc__` fired on a probe argument) -- the distinction that separates "
+        "this slot from `builtins.int.__new__`, which is NOT authorized precisely "
+        "because it does dispatch those hooks. No I/O, no caller-supplied callable "
+        "invoked. Slot only -- the type identity is NOT authorized. ADR-032 Task "
+        "38.10 Phase 0 authorization (2026-09-02, Aniket Bhalerao -- project owner/"
+        "reviewer), recorded prior to this entry."
+    ),
+    "functools.partial.__new__": (
+        "CPython stdlib partial-application constructor slot: STORES the wrapped "
+        "callable and the bound arguments and DOES NOT INVOKE the wrapped callable "
+        "-- measured invocations of the supplied func at construction were 0, "
+        "becoming 1 only when the resulting partial was later called. Its "
+        "nested-partial flattening reads C struct fields, not Python attributes "
+        "(verified against a `partial` subclass whose `func` is an overriding "
+        "property: the property never ran and flattening still occurred), so no "
+        "attribute-dispatch boundary is accepted either; its `callable()` guard is "
+        "a type-slot probe, not a `__call__` dispatch. No I/O, no thread start. "
+        "THIS ENTRY DOES NOT AUTHORIZE THE LATER INVOCATION of the stored callable: "
+        "that invocation is a separate, walker-visible explicit call which currently "
+        "fails closed (a `partial` instance and `functools.partial.__call__` both "
+        "classify `unresolved`), and if a future change makes either classify "
+        "resolved without also resolving the stored target, this entry must be "
+        "re-reviewed. Slot only -- the `functools.partial` type identity is NOT "
+        "authorized. ADR-032 Task 38.10 Phase 0 authorization (2026-09-02, Aniket "
+        "Bhalerao -- project owner/reviewer), recorded prior to this entry."
     ),
 }
 
