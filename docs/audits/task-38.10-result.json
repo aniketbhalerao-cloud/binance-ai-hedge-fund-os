@@ -1,0 +1,282 @@
+{
+  "audit_run": {
+    "calls_total": 7105,
+    "calls_unresolved": 1092,
+    "command": ".venv/bin/python -m audit_harness.run_audit",
+    "commit_sha": "d7fbd32f24227389b851e1165b30cf455a7a15c6",
+    "exact_identity_policy_version": "2026-09-02.1",
+    "exit_code": 1,
+    "exit_code_note": "Nonzero is the expected, correct outcome: ADR-032 remains INDETERMINATE / HOLD.",
+    "harness_schema_version": "38.8.0",
+    "identity_resolution_buckets": {
+      "exact_identity_policy": 2645,
+      "forbidden": 5,
+      "project_source_available": 3363,
+      "unresolved": 1092
+    },
+    "implicit_dispatch": {
+      "dispatch_candidates_total": 7012,
+      "explicit_path_duplicates": 0,
+      "resolved_dispatches": 124,
+      "resolved_non_descriptor_exclusion": 3777,
+      "syntax_sites_total": 10474,
+      "unresolved_dispatches": 6888
+    },
+    "module_state_candidates_total": 523,
+    "module_state_unexplained": 0,
+    "negative_controls_detected": 7,
+    "negative_controls_total": 7,
+    "nodes_total": 268,
+    "nodes_unresolved": 16,
+    "roots_traced": 25,
+    "roots_with_error": [],
+    "runtime_denial_checks": {
+      "bootstrap_status": "SUCCESS",
+      "forbidden_call_observed": null,
+      "preflight_failed": 0,
+      "preflight_passed": 25,
+      "preflight_total": 25,
+      "success": true
+    },
+    "self_test_failed": false
+  },
+  "determinism": {
+    "canonical_sha256": "e5476f87077ec3928629c7b1c54ae75e9169597cb63adb9698b3b141c1621b41",
+    "identical": true,
+    "note": "'python -m audit_harness.run_audit' executed twice, independently, against the same pushed HEAD d7fbd32. The two stdout captures are byte-for-byte identical (cmp clean) and share both the raw and the canonical (sort_keys/indent=2) SHA-256 above. Both captures were written outside the repository; neither is committed. These hashes are of the audit run's output, not of this evidence file.",
+    "raw_sha256": "6f42aba92c80f0b58ed95ed752786e65f322b18da9d03b7cb3a617754222f1fa",
+    "runs": 2
+  },
+  "gate": {
+    "adr_032": "INDETERMINATE / HOLD",
+    "h_1": "Closed (Task 38.9B)",
+    "h_2": "Closed (Task 38.9A)",
+    "layer_1_blockers": {
+      "calls_unresolved": 1092,
+      "implicit_dispatch_unresolved_dispatches": 6888,
+      "nodes_unresolved": 16
+    },
+    "m_8": "Open - taxonomy incomplete; narrowed only within the original 11-family taxonomy",
+    "note": "No claim is made that ADR-032 is ALLOWED, that Task 38.10 is complete, or that Task 39 is unblocked. Every Layer 1 counter above is independently nonzero and each alone is sufficient to keep the gate at HOLD.",
+    "open_high_findings": 0,
+    "str_join_phase_0_review": "paused and unrecorded - neither authorized nor rejected by this phase",
+    "task_39": "BLOCKED"
+  },
+  "node_reconciliation": {
+    "arithmetic": "6 resolved + 16 remaining == 22 baseline",
+    "baseline_unresolved_nodes_total": 22,
+    "measured_unresolved_nodes_total": 16,
+    "nodes_newly_unresolved": [],
+    "nodes_remaining_unresolved": [
+      "_io.StringIO",
+      "_io.TextIOWrapper",
+      "_thread._ExceptHookArgs",
+      "builtins.OSError",
+      "builtins.SyntaxError",
+      "builtins.bytearray",
+      "builtins.bytes",
+      "builtins.int",
+      "builtins.map",
+      "builtins.memoryview",
+      "builtins.range",
+      "builtins.type",
+      "collections.OrderedDict",
+      "collections.deque",
+      "itertools.islice",
+      "weakref.ReferenceType"
+    ],
+    "nodes_resolved_by_phase_a": [
+      "_thread.RLock",
+      "builtins.AssertionError",
+      "builtins.AttributeError",
+      "builtins.NotImplementedError",
+      "builtins.OverflowError",
+      "functools.partial"
+    ],
+    "source": "Both sets measured mechanically from fresh run_trace() executions -- the post-Phase-A set at d7fbd32 in the working repository, the baseline set at 25dd84c extracted with 'git archive' into a scratch directory outside the repository. Neither list is inferred from any Phase A report."
+  },
+  "phase": "B",
+  "policy_delta": {
+    "added_count": 9,
+    "added_equals_authorized_nine": true,
+    "added_keys": [
+      "_thread.RLock.__new__",
+      "builtins.AssertionError.__init__",
+      "builtins.AssertionError.__new__",
+      "builtins.AttributeError.__init__",
+      "builtins.NotImplementedError.__init__",
+      "builtins.NotImplementedError.__new__",
+      "builtins.OverflowError.__init__",
+      "builtins.OverflowError.__new__",
+      "functools.partial.__new__"
+    ],
+    "duplicate_keys_after": false,
+    "entries_after": 86,
+    "entries_before": 77,
+    "head_sha": "d7fbd32f24227389b851e1165b30cf455a7a15c6",
+    "method": "Both revisions of audit_harness/identity.py extracted with 'git show' and parsed with ast; the EXACT_IDENTITY_POLICY dict-literal key sets were diffed directly. This is independent of the committed test assertions.",
+    "parent_sha": "25dd84c8cc3e82676c4fa7c16ae07bacf1494fc7",
+    "removed_count": 0,
+    "removed_keys": [],
+    "unauthorized_added_keys": [],
+    "version_after": "2026-09-02.1",
+    "version_before": "2026-08-22.1",
+    "wildcard_or_pattern_keys": []
+  },
+  "prediction_reconciliation": [
+    {
+      "measured": "22 -> 16",
+      "metric": "nodes_unresolved",
+      "predicted": "22 -> 16",
+      "result": "prediction confirmed"
+    },
+    {
+      "cause": "All nine authorized identities are per-slot keys. Every corresponding explicit call site targets the TYPE object, which is deliberately not authorized, so a delta of exactly zero is the correct outcome.",
+      "measured": "1092 -> 1092",
+      "metric": "calls_unresolved",
+      "predicted": "1092 -> 1092",
+      "result": "prediction confirmed"
+    },
+    {
+      "authorization_unchanged": "This is an arithmetic correction to a recorded prediction only. It does not retroactively alter the Phase 0 authorization decision, and it does NOT imply the three withheld identities should now be added -- they remain deliberately unauthorized.",
+      "cause": "The 31 -> 19 figure recorded in ADR-032's Task 38.10 Phase 0 section was computed from a 12-key in-memory SAFE simulation. Human authorization deliberately narrowed the implemented set to 9 identities, withholding three that met the safety predicate but resolve no node while their sibling slot stays deferred: builtins.OSError.__init__, builtins.bytearray.__new__, collections.deque.__new__. Therefore 31 - 9 = 22.",
+      "documentation_correction_owner": "Phase C. ADR-032's recorded prediction is not amended by this phase.",
+      "governing_value": "31 -> 22",
+      "measured": "31 -> 22",
+      "metric": "unresolved_node_components",
+      "not_a_harness_defect": true,
+      "predicted": "31 -> 19",
+      "result": "prediction superseded"
+    }
+  ],
+  "provenance": {
+    "accepting_reviewer": "Aniket Bhalerao - project owner/reviewer, 2026-09-02",
+    "authorization_record": "docs/architecture/decisions/ADR-032-structural-audit-gate.md, section 'Task 38.10 Phase 0'",
+    "authorization_sha": "25dd84c8cc3e82676c4fa7c16ae07bacf1494fc7",
+    "authorization_subject": "docs(audit): authorize Task 38.10 exact identities",
+    "commit_sha": "d7fbd32f24227389b851e1165b30cf455a7a15c6",
+    "implementation_paths": [
+      "audit_harness/identity.py",
+      "tests/audit_harness/test_task_38_10_phase_a_policy.py"
+    ],
+    "implementation_subject": "test(audit): implement Task 38.10 exact identities",
+    "interpreter_of_record": "CPython 3.12.13 (pyproject requires-python '==3.12.*')",
+    "two_phase_provenance": "The human authorization (25dd84c) was recorded and pushed before the implementation (d7fbd32) was written, per Task 38.7's Two-Phase Provenance rule; 25dd84c is d7fbd32's parent, which git itself attests."
+  },
+  "schema_version": "38.10.1",
+  "scope_confirmation": {
+    "deferred_or_rejected_identities_added": 0,
+    "implementation_behaved_as_authorized": true,
+    "keys_removed": 0,
+    "type_level_identities_added": 0,
+    "unauthorized_identities_added": 0
+  },
+  "scope_note": "Evidence only. This phase modified no production source, no test, and no governance document. It re-runs the verification battery and the structural audit against the already-pushed Phase A commit, reconciles the policy delta mechanically against Phase A's parent, and records the measured residuals. It does not amend ADR-032 or the risk register -- that is Phase C's exclusive responsibility and has not been started.",
+  "task": "Task 38.10 Phase B - exact-identity policy authorization evidence (9 slot identities)",
+  "unresolved_components": {
+    "baseline_sha": "25dd84c8cc3e82676c4fa7c16ae07bacf1494fc7",
+    "baseline_total": 31,
+    "components_resolved_by_phase_a": [
+      "_thread.RLock.__new__",
+      "builtins.AssertionError.__init__",
+      "builtins.AssertionError.__new__",
+      "builtins.AttributeError.__init__",
+      "builtins.NotImplementedError.__init__",
+      "builtins.NotImplementedError.__new__",
+      "builtins.OverflowError.__init__",
+      "builtins.OverflowError.__new__",
+      "functools.partial.__new__"
+    ],
+    "current_components_by_node": {
+      "_io.StringIO": [
+        "__init__",
+        "__new__"
+      ],
+      "_io.TextIOWrapper": [
+        "__init__"
+      ],
+      "_thread._ExceptHookArgs": [
+        "__new__"
+      ],
+      "builtins.OSError": [
+        "__init__",
+        "__new__"
+      ],
+      "builtins.SyntaxError": [
+        "__init__"
+      ],
+      "builtins.bytearray": [
+        "__init__",
+        "__new__"
+      ],
+      "builtins.bytes": [
+        "__new__"
+      ],
+      "builtins.int": [
+        "__new__"
+      ],
+      "builtins.map": [
+        "__new__"
+      ],
+      "builtins.memoryview": [
+        "__new__"
+      ],
+      "builtins.range": [
+        "__new__"
+      ],
+      "builtins.type": [
+        "__init__",
+        "__new__"
+      ],
+      "collections.OrderedDict": [
+        "__init__"
+      ],
+      "collections.deque": [
+        "__init__",
+        "__new__"
+      ],
+      "itertools.islice": [
+        "__new__"
+      ],
+      "weakref.ReferenceType": [
+        "__init__",
+        "__new__"
+      ]
+    },
+    "delta": -9,
+    "measured_sha": "d7fbd32f24227389b851e1165b30cf455a7a15c6",
+    "measured_total": 22,
+    "measurement_method": "audit_harness.trace.run_trace() invoked directly; for each NodeRecord whose .unresolved is True, the components counted are exactly the verdict fields NodeRecord.unresolved itself inspects -- .init, .new, .post_init (when present) and every .default_factories entry. Callable classification is not reimplemented anywhere in this measurement.",
+    "reconciliation": "The -9 delta reconciles one-to-one, with no residue, to the nine authorized slot identities: each newly-resolved component is exactly one of the nine keys added to EXACT_IDENTITY_POLICY."
+  },
+  "verdict": "PASS",
+  "verification": {
+    "audit_harness_tests": {
+      "command": ".venv/bin/pytest tests/audit_harness -q",
+      "result": "204 passed"
+    },
+    "full_suite": {
+      "command": ".venv/bin/pytest -q",
+      "result": "957 passed"
+    },
+    "mypy_repo_wide_preexisting": {
+      "command": ".venv/bin/mypy .",
+      "note": "NOT a Task 38.10 regression. Reproduced identically, by 'git archive' extraction into a scratch directory outside the repository, at pristine d7fbd32 AND at pre-Phase-A 25dd84c -- so it predates Phase A entirely. Phase A neither introduces nor fixes it.",
+      "preexisting": true,
+      "result": "1 error: adapters/binance/adapter.py: Source file found twice under different module names"
+    },
+    "mypy_targeted": {
+      "command": ".venv/bin/mypy audit_harness tests/audit_harness",
+      "note": "Scoped to the two paths Phase A touched. Other pre-existing errors in that run's wider file set are untouched by this task and are not claimed clean here.",
+      "result": "0 errors in audit_harness/identity.py and tests/audit_harness/test_task_38_10_phase_a_policy.py"
+    },
+    "ruff": {
+      "command": ".venv/bin/ruff check audit_harness tests/audit_harness",
+      "result": "clean"
+    },
+    "targeted_tests": {
+      "command": ".venv/bin/pytest tests/audit_harness/test_task_38_10_phase_a_policy.py -q",
+      "result": "13 passed"
+    }
+  }
+}
