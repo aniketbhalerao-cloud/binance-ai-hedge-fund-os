@@ -1,0 +1,275 @@
+{
+  "audit_run": {
+    "calls_total": 7105,
+    "calls_unresolved": 901,
+    "command": "uv run python -m audit_harness.run_audit",
+    "commit_sha": "86820007cba4160f15f04bf3a4f297c705c5afd7",
+    "evidence_capture_detail": "The canonical command above writes the report to stdout and persists nothing. For evidence capture only, each of the three runs had its stdout redirected to /tmp/phaseb_run1.json, /tmp/phaseb_run2.json and /tmp/phaseb_run3.json -- outside the repository, none committed. The redirection is a capture mechanism, not part of the canonical command.",
+    "exact_identity_policy_version": "2026-09-02.1",
+    "exit_code": 1,
+    "exit_code_note": "Nonzero is the expected, correct outcome: ADR-032 remains INDETERMINATE / HOLD.",
+    "harness_schema_version": "38.8.0",
+    "harness_schema_version_note": "Task 38.11 does NOT bump the harness report schema. 38.8.0 is asserted by tests/audit_harness/test_task_38_8_schema.py and is unchanged by this task. '38.11.1' below is this evidence file's own schema id, a separate namespace.",
+    "identity_resolution_buckets": {
+      "exact_identity_policy": 2645,
+      "forbidden": 5,
+      "project_source_available": 3554,
+      "unresolved": 901
+    },
+    "identity_resolution_buckets_sum": 7105,
+    "implicit_dispatch": {
+      "dispatch_candidates_total": 7012,
+      "explicit_path_duplicates": 0,
+      "resolved_dispatches": 124,
+      "resolved_non_descriptor_exclusion": 3777,
+      "syntax_sites_total": 10474,
+      "unresolved_dispatches": 6888
+    },
+    "module_state_candidates_total": 523,
+    "module_state_parse_errors": 0,
+    "module_state_unexplained": 0,
+    "negative_controls_detail": [
+      "forbidden_post_init: detected -- open(self.path) inside a fixture __post_init__",
+      "unresolvable_call_reported: detected -- mystery.do_something_unverifiable()",
+      "module_global_mutation_from_plain_function: detected -- _fixture_module_global mutated in a plain function",
+      "direct_os_open_call: detected -- os.open(...) called directly",
+      "db_redis_exchange_connection_intercepted: detected -- all three fake clients intercepted before any connection: ['db', 'redis', 'exchange_adapter']",
+      "implicit_context_manager_dispatch_detected: detected -- open(...) inside ForbiddenEnterOnly.__enter__, triggered via `with obj:`",
+      "implicit_descriptor_dispatch_detected: detected -- open(...) inside ForbiddenProperty.value's fget, triggered via a bare attribute read",
+      "incomplete_registration_provider_set_fails_closed: detected -- one walked provider for two semantic registration targets",
+      "unresolved_registration_provider_set_member_fails_closed: detected -- one unresolved member makes the aggregate unresolved",
+      "empty_or_unavailable_registration_provider_set_fails_closed: detected -- empty enumeration and unavailable provenance both remain unresolved"
+    ],
+    "negative_controls_detected": 10,
+    "negative_controls_total": 10,
+    "nodes_total": 268,
+    "nodes_unresolved": 16,
+    "roots_traced": 25,
+    "roots_with_error": [],
+    "runtime_denial_checks": {
+      "bootstrap_status": "SUCCESS",
+      "exchange_adapter_connections_found": 1,
+      "forbidden_call_observed": null,
+      "preflight_failed": 0,
+      "preflight_passed": 25,
+      "preflight_total": 25,
+      "success": true,
+      "unimportable_nodes": []
+    },
+    "self_test_failed": false
+  },
+  "calls_reconciliation": {
+    "arithmetic": "1092 - 191 == 901",
+    "baseline_calls_unresolved": 1092,
+    "baseline_sha": "b17f4be8002a25372ffcb44c405c6b7d991ea379",
+    "delta": -191,
+    "measured_calls_unresolved": 901,
+    "measured_sha": "86820007cba4160f15f04bf3a4f297c705c5afd7",
+    "provider_set_records_resolved": 191,
+    "reconciliation": "The -191 delta reconciles one-to-one, with ZERO RESIDUE, to the 191 aggregate CallRecords tagged resolution_mechanism='di-registration-provider-set', every one of which resolved to project_source_available. No call site outside that mechanism changed category in either direction.",
+    "residue": 0
+  },
+  "determinism": {
+    "canonical_sha256": "afee9fff17de44c96fcc981f818e6e117b6626bf39d42c3c2f6cb81a38146841",
+    "canonicalization_convention": "audit_harness.report.AuditReport.canonical_json(): json.dumps(data, indent=2, sort_keys=True, ensure_ascii=True) + '\\n'. This is the same 'sort_keys/indent=2' convention named in docs/audits/task-38.10-result.json; the canonical hash here was recomputed from this task's own captures under that convention, not copied.",
+    "identical": true,
+    "note": "'uv run python -m audit_harness.run_audit' executed three times, independently, against the same pushed HEAD 86820007. All three stdout captures are 180006 bytes and byte-for-byte identical, sharing the raw SHA-256 below. Each capture is the canonical JSON (180005 bytes) plus the single trailing newline print() emits; the canonical SHA-256 above is of those 180005 bytes. All three captures were written outside the repository; none is committed. These hashes are of the audit run's output, not of this evidence file.",
+    "operator_error_disclosure": "A FOURTH, EARLIER capture attempt produced a 0-byte file (SHA-256 e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855, the hash of empty input) with exit code 1. Cause: an earlier 'cd /tmp' had left the shell's working directory outside the repository, so 'python -m audit_harness.run_audit' raised ModuleNotFoundError: No module named 'audit_harness' under an unrelated interpreter from the uv cache. This was OPERATOR ERROR IN THE EVIDENCE-CAPTURE PROCEDURE, NOT A HARNESS DEFECT and NOT a nondeterministic result: the harness never ran. It is disclosed here for completeness and is explicitly NOT one of the three valid runs. The three runs counted below were each invoked with an explicit repository-root working directory, matching the run_audit docstring's documented usage ('from the repository root').",
+    "raw_sha256": "30cb0df927406afec109f0bc7d844c2acdd83b2728fb9beac68d365c5d1ac1d8",
+    "runs": 3,
+    "runs_note": "runs=3 counts successful canonical runs only."
+  },
+  "gate": {
+    "adr_032": "INDETERMINATE / HOLD",
+    "h_1": "Closed (Task 38.9B)",
+    "h_2": "Closed (Task 38.9A)",
+    "layer_1_blockers": {
+      "calls_unresolved": 901,
+      "implicit_dispatch_unresolved_dispatches": 6888,
+      "nodes_unresolved": 16
+    },
+    "m_7": "Open, narrowed",
+    "m_8": "Open - taxonomy incomplete; narrowed only within the original 11-family taxonomy. Unchanged by Task 38.11.",
+    "m_9": "Open - registrar-discovery scan gap. Unchanged and explicitly NOT remediated by Task 38.11; audit_harness/discovery.py was not modified.",
+    "note": "No claim is made that ADR-032 is ALLOWED, that the structural audit is complete, or that Task 39 is unblocked. Every Layer 1 counter above is independently nonzero and each alone is sufficient to keep the gate at HOLD. The audit's own exit_code is 1.",
+    "open_high_findings": 0,
+    "str_join_phase_0_review": "paused and unrecorded - neither authorized nor rejected by this phase",
+    "task_39": "BLOCKED"
+  },
+  "phase": "B",
+  "policy_delta": {
+    "added_count": 0,
+    "added_keys": [],
+    "entries_after": 86,
+    "entries_before": 86,
+    "head_sha": "86820007cba4160f15f04bf3a4f297c705c5afd7",
+    "method": "EXACT_IDENTITY_POLICY was not touched by Task 38.11 Phase A; audit_harness/identity.py is not among the four changed paths. The version and entry count reported by the fresh audit run at 86820007 are identical to Task 38.10's post-implementation values.",
+    "parent_sha": "b17f4be8002a25372ffcb44c405c6b7d991ea379",
+    "removed_count": 0,
+    "removed_keys": [],
+    "version_after": "2026-09-02.1",
+    "version_before": "2026-09-02.1",
+    "zero_delta": true
+  },
+  "prediction_reconciliation": [
+    {
+      "measured": "7105",
+      "metric": "calls_total",
+      "predicted": "7105",
+      "result": "prediction confirmed",
+      "source": "canonical schema-38.8.0 report field"
+    },
+    {
+      "measured": "1092 -> 901",
+      "metric": "calls_unresolved",
+      "predicted": "1092 -> 901",
+      "result": "prediction confirmed",
+      "source": "canonical schema-38.8.0 report field"
+    },
+    {
+      "measured": "268 / 16",
+      "metric": "nodes_total / nodes_unresolved",
+      "predicted": "268 / 16",
+      "result": "prediction confirmed",
+      "source": "canonical schema-38.8.0 report field"
+    },
+    {
+      "measured": "7012 / 6888 / 124",
+      "metric": "implicit_dispatch candidates / unresolved / resolved",
+      "predicted": "7012 / 6888 / 124",
+      "result": "prediction confirmed",
+      "source": "canonical schema-38.8.0 report field"
+    },
+    {
+      "measured": "191 / 0",
+      "metric": "provider-set aggregate records emitted / unresolved",
+      "predicted": "191 / 0",
+      "result": "prediction confirmed",
+      "source": "derived read-only from a fresh run_trace() at 86820007 by filtering CallRecords on resolution_mechanism"
+    },
+    {
+      "measured": "not measured",
+      "metric": "visited_funcs",
+      "not_canonically_confirmed": true,
+      "note": "visited_funcs is NOT a field of the canonical schema-38.8.0 report. It is an attribute of audit_harness.trace.StaticWalker, not of TraceResult, and it was not measured in Phase B. The ADR's prospective 1625 -> 1625 figure is therefore NEITHER confirmed NOR refuted by this evidence, and must not be described as canonically confirmed.",
+      "predicted": "1625 -> 1625",
+      "result": "not evaluable from the canonical report",
+      "source": "n/a"
+    },
+    {
+      "measured": "383 (non-canonical)",
+      "metric": "resolve_events",
+      "not_canonically_confirmed": true,
+      "note": "resolve_events is NOT a field of the canonical schema-38.8.0 report. The value 383 was obtained by direct, read-only run_trace() introspection outside the canonical report path and matches the ADR's prospective figure, but this is a NON-CANONICAL observation. It must not be described as canonically confirmed.",
+      "predicted": "383 -> 383",
+      "result": "consistent with a non-canonical observation only",
+      "source": "direct run_trace() introspection, outside the canonical report"
+    },
+    {
+      "excluded_from_metrics_neutrality_claim": true,
+      "measured": "10 / 10",
+      "metric": "negative_controls detected / total",
+      "note": "The 7/7 -> 10/10 change is INTENTIONAL and was authorized in advance by ADR-032 Phase 0.3, which explicitly excludes it from the metrics-neutrality claim. The neutrality claim covers calls_total, visited_funcs, nodes_total, nodes_unresolved, resolve_events and every implicit_dispatch.* field only.",
+      "predicted": "7 / 7 -> 10 / 10",
+      "result": "prediction confirmed",
+      "source": "canonical schema-38.8.0 report field"
+    }
+  ],
+  "provenance": {
+    "accepting_reviewer": "Aniket Bhalerao - project owner/reviewer, 2026-09-03",
+    "authorization_record": "docs/architecture/decisions/ADR-032-structural-audit-gate.md, section 'Task 38.11 Phase 0.3'",
+    "authorization_sha": "b17f4be8002a25372ffcb44c405c6b7d991ea379",
+    "commit_sha": "86820007cba4160f15f04bf3a4f297c705c5afd7",
+    "implementation_paths": [
+      "audit_harness/self_test.py",
+      "audit_harness/trace.py",
+      "tests/audit_harness/test_negative_controls.py",
+      "tests/audit_harness/test_task_38_11_phase_a.py"
+    ],
+    "implementation_subject": "feat(audit): implement Task 38.11 Phase A provider-set tracing",
+    "interpreter_of_record": "CPython 3.12.13 (pyproject requires-python '==3.12.*')",
+    "two_phase_provenance": "The human authorization (b17f4be8) was recorded and pushed before the implementation (86820007) was written, per Task 38.7's Two-Phase Provenance rule; b17f4be8 is 86820007's parent, which git itself attests."
+  },
+  "provider_set_resolution": {
+    "aggregate_records_total": 191,
+    "aggregate_records_unresolved": 0,
+    "code_objects": 101,
+    "dedup": "id(_underlying(provider))",
+    "dedup_note": "Deduplication is SOLELY by id(_underlying(provider)). symbol_identities (76) and code_objects (101) are published as DIAGNOSTIC UNSOUND AXES -- they are recorded precisely so that any future regression to symbol-based or code-object-based deduplication becomes visible in the report itself. Neither is an authorization predicate, and neither participates in the resolution verdict.",
+    "distinct_rationales": 1,
+    "distinct_site_labels": 74,
+    "identity_categories": {
+      "project_source_available": 191
+    },
+    "measurement_method": "audit_harness.trace.run_trace() invoked directly, read-only, at 86820007; CallRecords filtered on resolution_mechanism == 'di-registration-provider-set'. Category and rationale read from each record's verdict.",
+    "rationale": "semantic_targets=214; walked_objects=214; symbol_identities=76; code_objects=101; dedup=object-identity; all_targets_resolved=true",
+    "resolution_mechanism": "di-registration-provider-set",
+    "semantic_targets": 214,
+    "site_semantics": "The 191 aggregate records represent WALKER SITE VISITS of ONE source AST location under the existing specialization semantics -- NOT 191 unique source locations. Mechanically verified: an ast walk of ServiceContainer.resolve (defined at core/container.py:87) contains EXACTLY ONE Call node whose callee text is 'registration.provider' -- 'registration.provider(cast(Resolver, self))' at core/container.py:116. The 191 records are distributed across 74 distinct site labels, all carrying that same callee text, because the walker re-visits that single site once per enclosing specialization. Condition 7 of the authorization ('exactly ONE aggregate CallRecord per site visit') is satisfied: one record per visit, never one per target.",
+    "source_ast_location": "core/container.py:116",
+    "source_ast_locations_count": 1,
+    "symbol_identities": 76,
+    "walked_objects": 214
+  },
+  "schema_version": "38.11.1",
+  "scope_confirmation": {
+    "adr_032_status_changed": false,
+    "discovery_py_modified": false,
+    "exact_identity_policy_modified": false,
+    "implementation_behaved_as_authorized": true,
+    "implicit_descriptor_get_behavior_changed": false,
+    "key_specialization_added": false,
+    "live_trading_boundary_touched": false,
+    "m_8_or_m_9_changed": false,
+    "paper_trading_boundary_touched": false,
+    "provider_objects_reconstructed": false,
+    "risk_register_modified": false,
+    "symbol_or_code_based_dedup_used": false,
+    "uv_lock_modified": false
+  },
+  "scope_note": "Evidence only. This phase modified no production source, no test, and no governance document. It re-runs the verification battery and the structural audit against the already-pushed Phase A commit, reconciles the calls_unresolved delta mechanically against Phase A's parent, and records the measured residuals. It does not amend ADR-032 or the risk register -- that is Phase C's exclusive responsibility and has not been started.",
+  "task": "Task 38.11 Phase B - DI Registration Provider-Set Resolution authorization evidence",
+  "verdict": "PASS",
+  "verdict_scope": "PASS applies ONLY to conformance with the authorized Task 38.11 mechanism and its evidence requirements. It is NOT a gate verdict. ADR-032 remains INDETERMINATE / HOLD; Task 39 remains BLOCKED; M-7 remains Open, narrowed; M-8 and M-9 remain Open and unchanged.",
+  "verification": {
+    "audit_harness_tests": {
+      "command": "uv run pytest tests/audit_harness -q",
+      "result": "211 passed"
+    },
+    "full_suite": {
+      "command": "uv run pytest -q",
+      "result": "964 passed"
+    },
+    "git_diff_check": {
+      "command": "git diff --check",
+      "result": "clean"
+    },
+    "mypy_targeted": {
+      "command": "uv run mypy audit_harness/trace.py audit_harness/self_test.py tests/audit_harness/test_negative_controls.py tests/audit_harness/test_task_38_11_phase_a.py",
+      "note": "Scoped to the four paths Phase A touched. Pre-existing errors elsewhere in the repository are untouched by this task and are not claimed clean here.",
+      "result": "Success: no issues found in 4 source files"
+    },
+    "ruff_repo_wide_preexisting": {
+      "command": "uv run ruff check .",
+      "note": "NOT a Task 38.11 regression. Zero of the 75 findings fall in any of the four Phase A paths, which is independently confirmed by the two scoped ruff runs above and below. Breakdown by rule: UP042 x68, UP046 x4, B027 x2, E501 x1, spread across 55 files (largest: config/constants.py x5, models/order.py x4, adapters/interfaces.py x4, adapters/binance/models.py x4). Example: adapters/binance/models.py:24 UP042 'Class BinanceSide inherits from both str and enum.Enum'.",
+      "preexisting": true,
+      "result": "75 errors, all outside the four Phase A paths"
+    },
+    "ruff_scoped_harness": {
+      "command": "uv run ruff check audit_harness tests/audit_harness",
+      "result": "All checks passed"
+    },
+    "ruff_targeted": {
+      "command": "uv run ruff check audit_harness/trace.py audit_harness/self_test.py tests/audit_harness/test_negative_controls.py tests/audit_harness/test_task_38_11_phase_a.py",
+      "result": "All checks passed"
+    },
+    "targeted_tests": {
+      "command": "uv run pytest tests/audit_harness/test_task_38_11_phase_a.py tests/audit_harness/test_negative_controls.py -q",
+      "result": "15 passed"
+    },
+    "uv_lock_sha256_unchanged": {
+      "note": "uv.lock is untracked and was neither read into nor written by this phase. Hash recorded before and after the full measurement and verification battery.",
+      "value": "07982ccb31c51dd96c4a4936509c2c22ac25d753f9c20e831dcd500587ae05fb"
+    }
+  }
+}
