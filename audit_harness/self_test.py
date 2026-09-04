@@ -1,5 +1,5 @@
-"""Harness Requirement 7 + item-5 of the implementation instructions:
-run the five negative controls programmatically and report exactly
+"""Harness Requirement 7 + Task 38.11 Phase A:
+run the ten negative controls programmatically and report exactly
 which were detected. ``run_audit.run_full_audit`` calls this *before*
 trusting any other part of the run -- a missed negative control means
 ``self_test_failed`` is set and the run must never claim a clean gate.
@@ -14,11 +14,14 @@ silently drift apart.
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from audit_harness.module_state import scan_module
 from audit_harness.runtime_denial import ForbiddenOperationError, _apply_patches
-from audit_harness.trace import StaticWalker
+from audit_harness.trace import CallRecord, StaticWalker, _underlying
+from core.container import ServiceContainer
+from core.registry import ServiceRegistry
 from tests.audit_harness.fixtures import implicit_dispatch as implicit_fx
 from tests.audit_harness.fixtures import negative_controls as fx
 
@@ -28,6 +31,35 @@ class NegativeControlResult:
     name: str
     detected: bool
     detail: str
+
+
+def _resolved_registration_provider(_resolver: object) -> None:
+    return None
+
+
+def _walk_registration_provider_set(
+    providers: dict[int, Callable[..., object]] | None,
+    semantic_count: int | None,
+) -> StaticWalker:
+    walker = StaticWalker(
+        registration_providers=providers,
+        registration_provider_semantic_count=semantic_count,
+    )
+    walker.instance_attribute_types[(ServiceContainer, "_registry")] = ServiceRegistry
+    walker.walk(
+        ServiceContainer.resolve,
+        "self-test:registration-provider-set",
+        owner_class=ServiceContainer,
+    )
+    return walker
+
+
+def _registration_provider_set_records(walker: StaticWalker) -> list[CallRecord]:
+    return [
+        record
+        for record in walker.call_records
+        if record.resolution_mechanism == "di-registration-provider-set"
+    ]
 
 
 def _check_forbidden_post_init() -> NegativeControlResult:
@@ -184,6 +216,53 @@ def _check_implicit_descriptor_dispatch_detected() -> NegativeControlResult:
     )
 
 
+def _check_incomplete_registration_provider_set() -> NegativeControlResult:
+    provider = _resolved_registration_provider
+    walker = _walk_registration_provider_set(
+        {id(_underlying(provider)): provider}, 2
+    )
+    records = _registration_provider_set_records(walker)
+    hit = len(records) == 1 and records[0].verdict.category == "unresolved"
+    return NegativeControlResult(
+        "incomplete_registration_provider_set_fails_closed",
+        hit,
+        "one walked provider for two semantic registration targets",
+    )
+
+
+def _check_unresolved_registration_provider_set_member() -> NegativeControlResult:
+    providers = (_resolved_registration_provider, print)
+    walker = _walk_registration_provider_set(
+        {id(_underlying(provider)): provider for provider in providers},
+        len(providers),
+    )
+    records = _registration_provider_set_records(walker)
+    hit = len(records) == 1 and records[0].verdict.category == "unresolved"
+    return NegativeControlResult(
+        "unresolved_registration_provider_set_member_fails_closed",
+        hit,
+        "one unresolved member makes the aggregate unresolved",
+    )
+
+
+def _check_empty_or_unavailable_registration_provider_set() -> NegativeControlResult:
+    empty_records = _registration_provider_set_records(
+        _walk_registration_provider_set({}, 0)
+    )
+    unavailable_records = _registration_provider_set_records(
+        _walk_registration_provider_set(None, None)
+    )
+    hit = all(
+        len(records) == 1 and records[0].verdict.category == "unresolved"
+        for records in (empty_records, unavailable_records)
+    )
+    return NegativeControlResult(
+        "empty_or_unavailable_registration_provider_set_fails_closed",
+        hit,
+        "empty enumeration and unavailable provenance both remain unresolved",
+    )
+
+
 def run_self_tests() -> tuple[NegativeControlResult, ...]:
     return (
         _check_forbidden_post_init(),
@@ -193,4 +272,7 @@ def run_self_tests() -> tuple[NegativeControlResult, ...]:
         _check_connecting_client_intercepted(),
         _check_implicit_context_manager_dispatch_detected(),
         _check_implicit_descriptor_dispatch_detected(),
+        _check_incomplete_registration_provider_set(),
+        _check_unresolved_registration_provider_set_member(),
+        _check_empty_or_unavailable_registration_provider_set(),
     )

@@ -438,6 +438,8 @@ class StaticWalker:
         protocol_name_implementer: dict[str, type] | None = None,
         provider_class: type | None = None,
         provider_owner_module: str | None = None,
+        registration_providers: dict[int, Callable[..., object]] | None = None,
+        registration_provider_semantic_count: int | None = None,
         max_total_walk_steps: int = _MAX_TOTAL_WALK_STEPS,
     ) -> None:
         #: Keyed by (callable identity, call-site specialization
@@ -470,6 +472,10 @@ class StaticWalker:
         # whose classes may use this assertion (market_data.service).
         self.provider_class = provider_class
         self.provider_owner_module = provider_owner_module
+        self.registration_providers = registration_providers
+        self.registration_provider_semantic_count = (
+            registration_provider_semantic_count
+        )
         #: (owner_class, attribute_name) -> the real type of that instance
         #: attribute, for the small number of ``self.<attr>.<method>()``
         #: chains this codebase's own container/registry machinery uses
@@ -1300,6 +1306,105 @@ class StaticWalker:
             CallRecord(site_label, callee_text, mechanism, verdict)
         )
         return verdict
+
+    def _walk_provider_root(
+        self,
+        provider_id: int,
+        provider: Callable[..., object],
+        always_follow_modules: frozenset[str],
+    ) -> None:
+        from core.container import ServiceContainer
+
+        forced: dict[str, type] = {}
+        try:
+            params = list(inspect.signature(provider).parameters.values())
+            if len(params) == 1:
+                forced[params[0].name] = ServiceContainer
+        except (TypeError, ValueError):
+            pass
+        provider_qualname = getattr(provider, "__qualname__", "")
+        self.walk(
+            provider,
+            f"provider:{provider_qualname or provider_id}",
+            always_follow_modules=always_follow_modules,
+            forced_param_hints=forced,
+            owner_class=_owner_class_from_qualname(
+                provider_qualname, getattr(provider, "__module__", None)
+            ),
+        )
+
+    def _resolve_registration_provider_set(
+        self,
+        node: ast.Call,
+        site_label: str,
+        always_follow_modules: frozenset[str],
+    ) -> None:
+        providers = self.registration_providers
+        semantic_targets = self.registration_provider_semantic_count
+        targets = tuple(providers.items()) if providers is not None else ()
+        walked_objects = len(targets)
+        identity_deduped = all(
+            provider_id == id(_underlying(provider))
+            for provider_id, provider in targets
+        )
+        target_verdicts: list[IdentityVerdict] = []
+        sources_available: list[bool] = []
+        symbol_identities: set[tuple[str | None, str | None]] = set()
+        code_objects: set[int] = set()
+
+        for provider_id, provider in targets:
+            real_provider = _underlying(provider)
+            module, qualname = module_and_qualname(real_provider)
+            symbol_identities.add((module, qualname))
+            code = getattr(real_provider, "__code__", None)
+            if code is not None:
+                code_objects.add(id(code))
+            sources_available.append(_dedented_source(real_provider) is not None)
+            target_verdicts.append(
+                classify_callable(real_provider, module=module, qualname=qualname)
+            )
+            self._walk_provider_root(
+                provider_id, provider, always_follow_modules
+            )
+
+        enumeration_ran = providers is not None and semantic_targets is not None
+        all_targets_resolved = (
+            enumeration_ran
+            and walked_objects > 0
+            and walked_objects == semantic_targets
+            and identity_deduped
+            and all(sources_available)
+            and all(v.category != "unresolved" for v in target_verdicts)
+        )
+        semantic_targets_text = (
+            str(semantic_targets) if semantic_targets is not None else "unavailable"
+        )
+        rationale = (
+            f"semantic_targets={semantic_targets_text}; "
+            f"walked_objects={walked_objects}; "
+            f"symbol_identities={len(symbol_identities)}; "
+            f"code_objects={len(code_objects)}; "
+            "dedup=object-identity; "
+            f"all_targets_resolved={str(all_targets_resolved).lower()}"
+        )
+        self.call_records.append(
+            CallRecord(
+                site_label,
+                ast.unparse(node.func),
+                "di-registration-provider-set",
+                IdentityVerdict(
+                    None,
+                    None,
+                    (
+                        "project_source_available"
+                        if all_targets_resolved
+                        else "unresolved"
+                    ),
+                    rationale,
+                    all_targets_resolved,
+                ),
+            )
+        )
 
     def _specialization_key(
         self,
@@ -2269,6 +2374,26 @@ class StaticWalker:
                     )
                 continue
 
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "provider"
+            ):
+                from core.interfaces import Registration
+
+                receiver_type = self._infer_type(
+                    node.func.value,
+                    g,
+                    loc,
+                    owner_class,
+                    param_hints,
+                    local_var_types,
+                )
+                if receiver_type is Registration:
+                    self._resolve_registration_provider_set(
+                        node, site_label, always_follow_modules
+                    )
+                    continue
+
             target, mechanism = self._resolve_target(
                 node,
                 g,
@@ -2649,6 +2774,8 @@ def run_trace(*, max_total_walk_steps: int = _MAX_TOTAL_WALK_STEPS) -> TraceResu
     # -- Part A: 24 independent fresh-container traces --------------------
     all_resolve_events: list[ResolveEvent] = []
     providers_seen: dict[int, Callable[..., object]] = {}
+    registration_providers: dict[int, Callable[..., object]] = {}
+    registration_provider_semantic_count = 0
     provider_symbol_counts: dict[str, int] = {}
     result_classes: dict[str, type] = {}
     result_instances_by_type: dict[str, object] = {}
@@ -2717,13 +2844,18 @@ def run_trace(*, max_total_walk_steps: int = _MAX_TOTAL_WALK_STEPS) -> TraceResu
     for cid in sorted(component_registrars):
         component_registrars[cid](discovery_container)
     for key in discovery_container._registry:
+        registration_provider_semantic_count += 1
         registration = discovery_container._registry.get(key)
         discovered_provider = registration.provider
         sym = getattr(discovered_provider, "__qualname__", repr(discovered_provider))
-        providers_seen.setdefault(
-            id(_underlying(discovered_provider)), discovered_provider
-        )
+        provider_id = id(_underlying(discovered_provider))
+        providers_seen.setdefault(provider_id, discovered_provider)
+        registration_providers.setdefault(provider_id, discovered_provider)
         provider_symbol_counts.setdefault(sym, 0)
+    assert all(
+        provider_id == id(_underlying(provider))
+        for provider_id, provider in registration_providers.items()
+    ), "registration providers must be deduplicated by underlying object identity"
 
     mdps_qn = "market_data.service.MarketDataPipelineService"
     mdps_instance = result_instances_by_type.get(mdps_qn)
@@ -2742,6 +2874,8 @@ def run_trace(*, max_total_walk_steps: int = _MAX_TOTAL_WALK_STEPS) -> TraceResu
         protocol_name_implementer=protocol_name_implementer,
         provider_class=provider_attr_type,
         provider_owner_module="market_data.service",
+        registration_providers=registration_providers,
+        registration_provider_semantic_count=registration_provider_semantic_count,
         max_total_walk_steps=max_total_walk_steps,
     )
     walker.unified_nodes.update(result_classes)
@@ -2765,32 +2899,7 @@ def run_trace(*, max_total_walk_steps: int = _MAX_TOTAL_WALK_STEPS) -> TraceResu
         walker.walk(real, f"registrar:{cid}", always_follow_modules=_MECHANISM_MODULES)
 
     for pid, provider in providers_seen.items():
-        # `Provider = Callable[[Resolver], T]` (core.interfaces) is the
-        # type contract for *every* object registered as a provider --
-        # a structural fact about anything captured via providers_seen
-        # (Part A's real trace), not a name-based guess. This is what
-        # lets a bare `lambda r: r.resolve(X)` resolve `r` correctly even
-        # when inspect.getsource returns a truncated fragment that omits
-        # the enclosing `container.register_singleton(...)` call entirely
-        # (a real quirk observed for some lambda argument positions).
-        forced: dict[str, type] = {}
-        try:
-            sig = inspect.signature(provider)
-            params = list(sig.parameters.values())
-            if len(params) == 1:
-                forced[params[0].name] = ServiceContainer
-        except (TypeError, ValueError):
-            pass
-        provider_qualname = getattr(provider, "__qualname__", "")
-        walker.walk(
-            provider,
-            f"provider:{provider_qualname or pid}",
-            always_follow_modules=_MECHANISM_MODULES,
-            forced_param_hints=forced,
-            owner_class=_owner_class_from_qualname(
-                provider_qualname, getattr(provider, "__module__", None)
-            ),
-        )
+        walker._walk_provider_root(pid, provider, _MECHANISM_MODULES)
 
     walker.walk(
         app_main.main,

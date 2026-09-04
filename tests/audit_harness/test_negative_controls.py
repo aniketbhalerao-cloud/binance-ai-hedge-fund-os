@@ -12,11 +12,10 @@ from __future__ import annotations
 from audit_harness.self_test import run_self_tests
 
 
-def test_all_seven_negative_controls_are_detected() -> None:
-    """5 original (Task 38.6) + 2 added by Task 38.8 Phase A.1 for the
-    2 newly-mechanized implicit-dispatch families."""
+def test_all_ten_negative_controls_are_detected() -> None:
+    """5 original + 2 implicit-dispatch + 3 provider-set controls."""
     results = run_self_tests()
-    assert len(results) == 7
+    assert len(results) == 10
     undetected = [r for r in results if not r.detected]
     assert not undetected, (
         f"negative controls not detected: {[(r.name, r.detail) for r in undetected]}"
@@ -70,5 +69,32 @@ def test_implicit_descriptor_dispatch_is_detected() -> None:
         r
         for r in run_self_tests()
         if r.name == "implicit_descriptor_dispatch_detected"
+    )
+    assert result.detected
+
+
+def test_incomplete_registration_provider_set_fails_closed() -> None:
+    result = next(
+        r
+        for r in run_self_tests()
+        if r.name == "incomplete_registration_provider_set_fails_closed"
+    )
+    assert result.detected
+
+
+def test_unresolved_registration_provider_set_member_fails_closed() -> None:
+    result = next(
+        r
+        for r in run_self_tests()
+        if r.name == "unresolved_registration_provider_set_member_fails_closed"
+    )
+    assert result.detected
+
+
+def test_empty_or_unavailable_registration_provider_set_fails_closed() -> None:
+    result = next(
+        r
+        for r in run_self_tests()
+        if r.name == "empty_or_unavailable_registration_provider_set_fails_closed"
     )
     assert result.detected
