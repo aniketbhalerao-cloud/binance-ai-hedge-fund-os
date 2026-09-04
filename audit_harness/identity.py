@@ -93,7 +93,15 @@ PROJECT_TOP_LEVEL_PACKAGES: frozenset[str] = frozenset(
 #: builtins.bytearray.__new__, collections.deque.__new__), Family E
 #: (_io.StringIO/_io.TextIOWrapper), and every corresponding
 #: TYPE-level identity all remain absent by that same authorization.
-EXACT_IDENTITY_POLICY_VERSION = "2026-09-02.1"
+#: 2026-09-05.1 (Task 38.12 Phase A): builtins.str.join added -- the
+#: single identity ADR-032's "Task 38.12 Phase 0" section authorizes
+#: (2026-09-05, Aniket Bhalerao -- project owner/reviewer), rationalized
+#: from that section's own irreducibility, operational-boundary, and
+#: real-residual evidence on CPython 3.12.13. Nothing else is added:
+#: os.path.join (posixpath.join) and bytes.join (builtins.bytes.join)
+#: are different identities that same authorization explicitly declined
+#: to review, and builtins.mappingproxy.items remains unreviewed.
+EXACT_IDENTITY_POLICY_VERSION = "2026-09-05.1"
 
 #: module.qualname -> per-entry safety rationale. Every entry is a
 #: single, individually reviewed, exact identity -- never a pattern.
@@ -250,6 +258,25 @@ EXACT_IDENTITY_POLICY: dict[str, str] = {
         ".rsplit above. ADR-032 Phase 0 authorization (2026-08-22, Aniket "
         "Bhalerao -- project owner/reviewer), recorded prior to this entry "
         "per Task 38.7's Two-Phase Provenance."
+    ),
+    "builtins.str.join": (
+        "CPython stdlib builtin: pure in-process string concatenation, no "
+        "I/O by definition -- returns a new str, never mutates the "
+        "immutable receiver, and performs no __str__/__repr__ coercion (a "
+        "non-str element raises TypeError), so it cannot dispatch into an "
+        "arbitrary user __str__. Caveat, recorded rather than presumed "
+        "benign: str.join iterates its argument, so side effects of that "
+        "argument's own __iter__/__next__ execute during the call. That is "
+        "a property of iteration at the call site, not of str.join's own "
+        "code, and is identical in kind to the already-authorized "
+        "iterable-consuming entries builtins.sorted/.any/.sum/.tuple/.set "
+        "above. Irreducible: a C-implemented method_descriptor with no "
+        "retrievable source, so no general Requirement 1-5 technique can "
+        "classify it past unresolved. ADR-032 Phase 0 authorization "
+        "(2026-09-05, Aniket Bhalerao -- project owner/reviewer), recorded "
+        "prior to this entry per Task 38.12's Two-Phase Provenance. Covers "
+        "this exact identity only -- os.path.join (posixpath.join) and "
+        "bytes.join are different identities and stay unresolved."
     ),
     "builtins.KeyError": (
         "CPython stdlib builtin exception type constructor: pure, no I/O by definition."

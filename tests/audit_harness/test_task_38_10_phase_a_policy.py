@@ -116,6 +116,13 @@ DEFERRED_SLOTS: tuple[tuple[type, str, str, str], ...] = (
     (io.TextIOWrapper, "__init__", "_io.TextIOWrapper.__init__", "Family E: I/O type"),
 )
 
+#: Keys added to the table *after* Task 38.10 Phase A, by later and
+#: separately ADR-032 Phase 0-authorized tasks. Listed so this file's
+#: cardinality pin stays exact as the table legitimately grows.
+LATER_AUTHORIZED_KEYS: tuple[str, ...] = (
+    "builtins.str.join",  # Task 38.12 Phase A (ADR-032 Phase 0, 2026-09-05)
+)
+
 #: The type objects whose slots are authorized. The authorization is
 #: slot-only; calling the type runs both slots plus whatever the type's
 #: own construction protocol dispatches, so none of these may be in the
@@ -151,10 +158,19 @@ def _classify_slot(cls: type, slot_name: str) -> IdentityVerdict:
 
 
 def test_policy_version_bumped_for_task_38_10_phase_a() -> None:
-    """The table changed, so its version must have moved off Task 38.7's."""
+    """The table changed, so its version must have moved off Task 38.7's.
+
+    Task 38.10 Phase A set `2026-09-02.1`. Task 38.12 Phase A bumped it
+    again for its own separately authorized entry, so this pins the
+    invariant this test actually owns -- the version is no longer Task
+    38.7's, and never moves backwards past Task 38.10's own bump. The
+    current exact value is pinned by
+    `tests/audit_harness/test_task_38_12_phase_a_policy.py`.
+    """
     from audit_harness.identity import EXACT_IDENTITY_POLICY_VERSION
 
-    assert EXACT_IDENTITY_POLICY_VERSION == "2026-09-02.1"
+    assert EXACT_IDENTITY_POLICY_VERSION != "2026-08-22.1"
+    assert EXACT_IDENTITY_POLICY_VERSION >= "2026-09-02.1"
 
 
 def test_nine_authorized_slots_are_in_the_policy_table() -> None:
@@ -283,8 +299,13 @@ def test_exception_and_lock_type_identities_remain_unresolved() -> None:
 
 def test_policy_grew_by_exactly_the_nine_authorized_keys() -> None:
     """Task 38.7's committed table held 77 entries; Task 38.10 Phase A
-    is authorized to add exactly nine and nothing else."""
-    assert len(EXACT_IDENTITY_POLICY) == 77 + len(AUTHORIZED_SLOTS)
+    is authorized to add exactly nine and nothing else. Entries added by
+    later, separately authorized tasks are enumerated explicitly in
+    ``LATER_AUTHORIZED_KEYS`` so this stays a real cardinality pin rather
+    than drifting to "whatever the table holds now"."""
+    assert len(EXACT_IDENTITY_POLICY) == (
+        77 + len(AUTHORIZED_SLOTS) + len(LATER_AUTHORIZED_KEYS)
+    )
 
 
 def test_no_policy_key_is_a_wildcard_or_pattern() -> None:
