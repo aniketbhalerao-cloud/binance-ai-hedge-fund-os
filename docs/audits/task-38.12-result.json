@@ -1,0 +1,382 @@
+{
+  "audit_run": {
+    "calls_total": 7105,
+    "calls_unresolved": 702,
+    "command": "uv run python -m audit_harness.run_audit",
+    "commit_sha": "afd5f5f833f3a818c05ee66ae1c16f8a469f0560",
+    "exact_identity_policy_version": "2026-09-05.1",
+    "exit_code": 1,
+    "exit_code_note": "exit_code=1 is EXPECTED and is not a Task 38.12 failure. Layer 1 blockers remain nonzero (nodes_unresolved=16, calls_unresolved=702, unresolved_dispatches=6888); the harness exits nonzero whenever any blocker is nonzero.",
+    "harness_schema_version": "38.8.0",
+    "identity_resolution_buckets": {
+      "exact_identity_policy": 2844,
+      "forbidden": 5,
+      "project_source_available": 3554,
+      "unresolved": 702
+    },
+    "identity_resolution_buckets_sum": 7105,
+    "implicit_dispatch": {
+      "dispatch_candidates_total": 7012,
+      "explicit_path_duplicates": 0,
+      "mechanized_protocol_families": [
+        "context_manager",
+        "descriptor"
+      ],
+      "resolved_dispatches": 124,
+      "resolved_non_descriptor_exclusion": 3777,
+      "syntax_sites_total": 10474,
+      "unresolved_dispatches": 6888,
+      "unsupported_protocol_families": [
+        "iteration/comprehensions",
+        "unpacking",
+        "await/async iteration",
+        "equality/ordering/arithmetic operators including reflected forms",
+        "truth testing",
+        "membership",
+        "subscription/assignment/deletion",
+        "hashing",
+        "formatting including __str__/__repr__ fallback"
+      ]
+    },
+    "module_state_buckets": {
+      "immutable_constant": 126,
+      "intentional_documented_shared_instance": 3,
+      "mutable_never_mutated_lookup": 394
+    },
+    "module_state_candidates_total": 523,
+    "module_state_unexplained": 0,
+    "negative_controls": {
+      "all_detected": true,
+      "detected": 10,
+      "total": 10
+    },
+    "nodes_total": 268,
+    "nodes_unresolved": 16,
+    "nodes_unresolved_detail": [
+      "_io.StringIO",
+      "_io.TextIOWrapper",
+      "_thread._ExceptHookArgs",
+      "builtins.OSError",
+      "builtins.SyntaxError",
+      "builtins.bytearray",
+      "builtins.bytes",
+      "builtins.int",
+      "builtins.map",
+      "builtins.memoryview",
+      "builtins.range",
+      "builtins.type",
+      "collections.OrderedDict",
+      "collections.deque",
+      "itertools.islice",
+      "weakref.ReferenceType"
+    ],
+    "roots_traced": 25,
+    "roots_with_error_total": 0,
+    "runtime_denial": {
+      "bootstrap_status": "SUCCESS",
+      "forbidden_call_observed": null,
+      "preflight_failed": 0,
+      "preflight_passed": 25,
+      "preflight_total": 25,
+      "success": true,
+      "unimportable_nodes": []
+    },
+    "self_test_failed": false
+  },
+  "calls_reconciliation": {
+    "baseline_calls_unresolved": 901,
+    "baseline_lineage_note": "The three commits between 8682000 and afd5f5f's parent aa220b7 changed only docs/ (ADR-032, the 38.11 evidence pair, the risk register). git diff --name-only 8682000 aa220b7 -- audit_harness tests is EMPTY, so 38.11's measurement is the valid immediate code baseline.",
+    "baseline_record": "docs/audits/task-38.11-result.json (Task 38.11 Phase B measurement)",
+    "baseline_sha": "86820007cba4160f15f04bf3a4f297c705c5afd7",
+    "bucket_arithmetic": {
+      "baseline_exact_identity_policy": 2645,
+      "delta": 199,
+      "equals_str_join_records": true,
+      "measured_exact_identity_policy": 2844
+    },
+    "delta": 199,
+    "internal_invariants": {
+      "bucket_unresolved_equals_calls_unresolved": true,
+      "buckets_sum_equals_calls_total": true,
+      "detail_len_equals_multiplicity_len": true,
+      "distinct_unresolved_sites": 373,
+      "implicit_resolved_plus_unresolved_equals_candidates": true,
+      "multiplicity_sum_equals_calls_unresolved": true,
+      "nodes_detail_len_equals_nodes_unresolved": true
+    },
+    "measured_calls_unresolved": 702,
+    "reconciliation": "901 - 199 = 702. The entire reduction in calls_unresolved is attributable to the single authorized identity builtins.str.join. Zero unexplained residue.",
+    "residue": 0,
+    "str_join_records_resolved": 199,
+    "unchanged_counters": {
+      "calls_total": {
+        "baseline": 7105,
+        "measured": 7105,
+        "unchanged": true
+      },
+      "dispatch_candidates_total": {
+        "baseline": 7012,
+        "measured": 7012,
+        "unchanged": true
+      },
+      "forbidden": {
+        "baseline": 5,
+        "measured": 5,
+        "unchanged": true
+      },
+      "nodes_unresolved": {
+        "baseline": 16,
+        "measured": 16,
+        "unchanged": true
+      },
+      "project_source_available": {
+        "baseline": 3554,
+        "measured": 3554,
+        "unchanged": true
+      },
+      "unresolved_dispatches": {
+        "baseline": 6888,
+        "measured": 6888,
+        "unchanged": true
+      }
+    }
+  },
+  "determinism": {
+    "canonicalization_convention": "audit_harness.report.Report.canonical_json()",
+    "raw_sha256_run1": "3ed7ededcdd819bb63b4aa49152b89ea1e143420fef0ec5d678401617e49a0f0",
+    "raw_sha256_run2": "3ed7ededcdd819bb63b4aa49152b89ea1e143420fef0ec5d678401617e49a0f0",
+    "run1_run2_identical": true,
+    "run3_identical_except_commit_sha": true,
+    "runs": 3,
+    "runs_note": "Run 1 and run 2 executed in-repo from the clean worktree; run 3 executed from a pristine out-of-repo extract of afd5f5f (git archive | tar -x). Runs 1 and 2 are byte-identical. Run 3 differs from them in the single field commit_sha ('unknown'), because the extract carries no .git directory; all other fields are identical."
+  },
+  "evidence_integrity": {
+    "action_required_before_staging": "The live worktree does NOT match afd5f5f. Restore tests/audit_harness/test_task_38_12_phase_a_policy.py from HEAD and identify the process making these edits before any Phase B artifact is staged or committed.",
+    "impact_on_this_evidence": "None. The audit measurement is unaffected: run_audit never imports tests/, run 1 predates the second drift (03:00:07 vs 03:02:03), and runs 1 and 2 are byte-identical. The entire test and ruff battery was re-run from a pristine extract of afd5f5f whose three Phase A blobs were verified to match the published objects exactly.",
+    "occurrences": [
+      {
+        "change": "removed the bytearray.join entry from UNAUTHORIZED_JOINS and its live-trace row (-7 lines)",
+        "disposition": "restored from HEAD under explicit authorization; push was unaffected",
+        "observed": "before the Phase A push",
+        "worktree_blob": "683b8ff2e78c8524e7104118faa1324acc151d74"
+      },
+      {
+        "change": "added an IdentityVerdict import, narrowed a return annotation, and softened 'str.join.__objclass__ is str' to a getattr() form",
+        "disposition": "NOT restored -- Phase B scope prohibits modifying tests/. Still present in the worktree.",
+        "observed": "during Phase B, file mtime 03:02:03",
+        "worktree_blob": "375da8075fdfd33cc21814b18331099571309079"
+      }
+    ],
+    "status": "DISCLOSED -- unauthorized worktree drift observed twice during Phase B",
+    "summary": "tests/audit_harness/test_task_38_12_phase_a_policy.py was modified in the working tree twice by an agent outside this session, without authorization. The committed and published object at afd5f5f was never affected."
+  },
+  "gate": {
+    "adr_032": "INDETERMINATE / HOLD -- unchanged by this phase",
+    "h_1": "Closed (Task 38.9B) -- unchanged by this phase",
+    "h_2": "Closed (Task 38.9A) -- unchanged by this phase",
+    "layer_1_blockers": {
+      "all_nonzero": true,
+      "calls_unresolved": 702,
+      "implicit_dispatch_unresolved_dispatches": 6888,
+      "nodes_unresolved": 16,
+      "note": "Each is independently sufficient to keep ADR-032 at HOLD."
+    },
+    "m_8": "Open -- taxonomy incomplete; unchanged and unaddressed by Task 38.12",
+    "note": "Task 38.12 materially reduced one Layer 1 blocker (calls_unresolved 901 -> 702) but did not clear it. 702 is nonzero. No claim is made that ADR-032 is ALLOWED or that Task 39 is unblocked.",
+    "open_high_findings": 0,
+    "phase_c": "NOT STARTED -- no governance document was read for modification or written",
+    "task_39": "BLOCKED -- unchanged by this phase"
+  },
+  "phase": "B",
+  "policy_delta": {
+    "added_count": 1,
+    "added_keys": [
+      "builtins.str.join"
+    ],
+    "entries_after": 87,
+    "entries_before": 86,
+    "head_sha": "afd5f5f833f3a818c05ee66ae1c16f8a469f0560",
+    "method": "git show aa220b7:audit_harness/identity.py vs HEAD, plus live import of EXACT_IDENTITY_POLICY.",
+    "parent_sha": "aa220b705e68ec1a9c900da69597d663732b0eb9",
+    "removed_count": 0,
+    "removed_keys": [],
+    "version_after": "2026-09-05.1",
+    "version_before": "2026-09-02.1"
+  },
+  "prediction_reconciliation": [
+    {
+      "counter": "calls_total",
+      "expected": 7105,
+      "match": true,
+      "measured": 7105
+    },
+    {
+      "counter": "calls_unresolved",
+      "expected": 702,
+      "match": true,
+      "measured": 702
+    },
+    {
+      "counter": "nodes_unresolved",
+      "expected": 16,
+      "match": true,
+      "measured": 16
+    },
+    {
+      "counter": "implicit_dispatch.unresolved_dispatches",
+      "expected": 6888,
+      "match": true,
+      "measured": 6888
+    },
+    {
+      "counter": "identity_resolution_buckets.exact_identity_policy",
+      "expected": 2844,
+      "match": true,
+      "measured": 2844
+    },
+    {
+      "counter": "exit_code",
+      "expected": 1,
+      "match": true,
+      "measured": 1
+    }
+  ],
+  "provenance": {
+    "accepting_reviewer": "Aniket Bhalerao -- project owner/reviewer",
+    "authorization_record": "ADR-032, 'Task 38.12 Phase 0' section (docs commit aa220b7)",
+    "authorization_sha": "aa220b705e68ec1a9c900da69597d663732b0eb9",
+    "commit_sha": "afd5f5f833f3a818c05ee66ae1c16f8a469f0560",
+    "implementation_paths": [
+      "audit_harness/identity.py",
+      "tests/audit_harness/test_task_38_10_phase_a_policy.py",
+      "tests/audit_harness/test_task_38_12_phase_a_policy.py"
+    ],
+    "implementation_subject": "builtins.str.join added to EXACT_IDENTITY_POLICY",
+    "interpreter_of_record": "CPython 3.12.13 (repository .venv)",
+    "published": "afd5f5f is HEAD, origin/main, and the live remote ref refs/heads/main.",
+    "two_phase_provenance": "Phase 0 authorization (aa220b7) was committed BEFORE the Phase A implementation (afd5f5f), per Task 38.7's Two-Phase Provenance requirement. afd5f5f's parent is exactly aa220b7."
+  },
+  "schema_version": "38.12.1",
+  "scope_confirmation": {
+    "adr_032_modified": false,
+    "audit_harness_modified": false,
+    "committed": false,
+    "exact_identity_policy_modified": false,
+    "phase_c_started": false,
+    "pushed": false,
+    "risk_register_modified": false,
+    "staged": false,
+    "tagged": false,
+    "task_39_started": false,
+    "tests_modified_by_this_phase": false,
+    "uv_lock_modified": false,
+    "worktree_drift_fixed": false,
+    "worktree_drift_fixed_note": "Out of Phase B scope; disclosed in 'evidence_integrity' instead."
+  },
+  "scope_note": "Evidence only. This phase modified no production source, no test, and no governance document. It re-runs the verification battery and records the measured effect of the Phase A policy entry.",
+  "str_join_resolution": {
+    "authorized_identity": "builtins.str.join",
+    "distinct_rationales": 1,
+    "excluded_identities": [
+      {
+        "buckets": {
+          "unresolved": 3
+        },
+        "identity": "posixpath.join",
+        "in_policy": false,
+        "status": "remains unresolved, as authorized",
+        "trace_occurrences": 3
+      },
+      {
+        "buckets": {
+          "unresolved": 1
+        },
+        "identity": "builtins.bytes.join",
+        "in_policy": false,
+        "status": "remains unresolved, as authorized",
+        "trace_occurrences": 1
+      },
+      {
+        "buckets": {},
+        "identity": "builtins.bytearray.join",
+        "in_policy": false,
+        "status": "unauthorized and unaffected; never reached on the live trace, so its exclusion is proven by classifier assertion (test_unauthorized_join_identities_classify_unresolved) rather than by trace residual",
+        "trace_occurrences": 0
+      }
+    ],
+    "identity_key_derivation": "str.join is a C-implemented method_descriptor with no __module__; its key ('builtins', 'str.join') is reconstructed from __objclass__ by audit_harness.identity.module_and_qualname.",
+    "measurement_method": "audit_harness.trace.run_trace(), then explicit_calls filtered on verdict.module/verdict.qualname. No name or text matching.",
+    "no_broad_matching": {
+      "conclusion": "Exactly one '.join' identity resolves. No wildcard, name-pattern, or textual '.join' exemption exists; the two other '.join' identities present on the trace stay unresolved.",
+      "policy_keys_ending_in_join": [
+        "builtins.str.join"
+      ],
+      "traced_identities_ending_in_join": [
+        {
+          "category": "exact_identity_policy",
+          "count": 199,
+          "identity": "builtins.str.join"
+        },
+        {
+          "category": "unresolved",
+          "count": 3,
+          "identity": "posixpath.join"
+        },
+        {
+          "category": "unresolved",
+          "count": 1,
+          "identity": "builtins.bytes.join"
+        }
+      ]
+    },
+    "rationale_matches_policy_text": true,
+    "records_in_any_other_bucket": 0,
+    "records_residual_unresolved": 0,
+    "records_resolved_exact_identity_policy": 199
+  },
+  "task": "Task 38.12 Phase B - builtins.str.join exact-identity authorization evidence",
+  "verdict": "PASS",
+  "verdict_scope": "PASS applies ONLY to conformance with the authorized Task 38.12 mechanism and its Phase B evidence requirements. It is NOT a gate verdict. ADR-032 remains INDETERMINATE / HOLD and Task 39 remains BLOCKED. See the 'gate' and 'evidence_integrity' sections.",
+  "verification": {
+    "audit_harness_tests": {
+      "command": "pytest tests/audit_harness -q",
+      "result": "222 passed"
+    },
+    "full_suite": {
+      "command": "pytest -q",
+      "result": "975 passed"
+    },
+    "git_diff_check": {
+      "command": "git diff --check",
+      "result": "clean, exit 0"
+    },
+    "measurement_environment_note": "All results in this section were measured from a pristine out-of-repo extract of afd5f5f, not from the live worktree. See 'evidence_integrity' for why.",
+    "ruff_repo_wide_preexisting": {
+      "attribution": "All 75 are PRE-EXISTING. The identical extract of the parent commit aa220b7 also reports exactly 75; delta introduced by Task 38.12 is 0. No finding is located in any Task 38.12 path.",
+      "command": "ruff check .",
+      "head_count": 75,
+      "introduced_by_task_38_12": 0,
+      "parent_count": 75,
+      "result": "75 errors",
+      "ruff_version": "0.16.1",
+      "rule_breakdown": {
+        "B027": 2,
+        "E501": 1,
+        "UP042": 68,
+        "UP046": 4
+      }
+    },
+    "ruff_scoped_phase_a_paths": {
+      "command": "ruff check audit_harness/identity.py tests/audit_harness/test_task_38_10_phase_a_policy.py tests/audit_harness/test_task_38_12_phase_a_policy.py",
+      "result": "All checks passed"
+    },
+    "targeted_tests": {
+      "command": "pytest tests/audit_harness/test_task_38_12_phase_a_policy.py tests/audit_harness/test_task_38_10_phase_a_policy.py -q",
+      "result": "24 passed"
+    },
+    "uv_lock_sha256_unchanged": {
+      "note": "Untracked and not written by this phase. Hashed before and after the full battery.",
+      "value": "07982ccb31c51dd96c4a4936509c2c22ac25d753f9c20e831dcd500587ae05fb"
+    }
+  }
+}
