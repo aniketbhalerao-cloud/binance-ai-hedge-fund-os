@@ -1216,9 +1216,9 @@ class StaticWalker:
         source here already follows.
 
         ``mechanism`` is the resolution mechanism :meth:`_resolve_target`
-        used for *this* call -- checked for exactly one shape: when it
-        is ``"local-variable-type-inference"``, ``target`` was reached
-        via ``getattr(a_type, attr)`` on a *type* (local-variable-type
+        used for *this* call -- checked for two shapes:
+        1. When it is ``"local-variable-type-inference"``, ``target`` was
+        reached via ``getattr(a_type, attr)`` on a *type* (local-variable-type
         inference never holds a live instance, only a type), which for
         an ordinary method yields the UNBOUND function -- its own first
         parameter is a receiver slot the AST call's explicit arguments
@@ -1233,7 +1233,18 @@ class StaticWalker:
         needed at all), never a ``classmethod`` (``getattr`` already
         returns it bound), and never a C descriptor or anything else
         ``getattr_static`` cannot cleanly classify -- left exactly as
-        before, never guessed from a parameter's name."""
+        before, never guessed from a parameter's name.
+        2. When it is ``"owner-class-attribute"`` (Task 38.14), ``target``
+        was resolved from the enclosing/owner class (e.g.
+        ``self._build(target, resolver)`` in
+        ``ServiceContainer.register_class``), which yields the unbound
+        function object. Prepending the receiver AST expression
+        (``node.func.value``) aligns positional parameters with their
+        actual arguments, but only when static non-executing inspection
+        (``inspect.getattr_static``) positively proves the raw attribute
+        is a plain Python instance function (strictly excluding
+        staticmethods, classmethods, properties, custom descriptors, C
+        descriptors, and callable class attributes)."""
         args: list[ast.expr] = list(node.args)
         if (
             mechanism == "local-variable-type-inference"
@@ -1249,6 +1260,27 @@ class StaticWalker:
                 raw_attr = None
             if inspect.isfunction(raw_attr):
                 args = [node.func.value, *args]
+        elif (
+            mechanism == "owner-class-attribute"
+            and isinstance(node.func, ast.Attribute)
+            and isinstance(node.func.value, ast.Name)
+        ):
+            target_qn = getattr(target, "__qualname__", "")
+            target_mod = getattr(target, "__module__", None)
+            owner_cls = _owner_class_from_qualname(target_qn, target_mod)
+            if owner_cls is None:
+                rec_val = loc.get(node.func.value.id)
+                if rec_val is not None:
+                    owner_cls = rec_val if inspect.isclass(rec_val) else type(rec_val)
+            if owner_cls is not None:
+                try:
+                    raw_attr = inspect.getattr_static(owner_cls, node.func.attr)
+                except AttributeError:
+                    raw_attr = None
+                if inspect.isfunction(raw_attr) and not isinstance(
+                    raw_attr, (staticmethod, classmethod)
+                ):
+                    args = [node.func.value, *args]
 
         try:
             sig = inspect.signature(target)  # type: ignore[arg-type]
