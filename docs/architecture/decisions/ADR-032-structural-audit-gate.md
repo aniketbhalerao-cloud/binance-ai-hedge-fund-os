@@ -399,6 +399,75 @@ Phase 0 projected `calls_unresolved` 901 → **702** (−199) with every other c
 
 **Gate outcome: HOLD, unchanged.** This record runs no harness against modified code, implements nothing, and clears no gate predicate. Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on the committed figures of record: `nodes_unresolved=16`, `calls_unresolved=702`, `implicit_dispatch.unresolved_dispatches=6888`; `exit_code=1`. Even if the projection in item 9 were realised in full, `calls_unresolved` would be **587** — still nonzero, and `nodes_unresolved` and `unresolved_dispatches` would not move at all; **no claim is made or permitted that Task 38.13 could clear the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged, since nothing is implemented and no residual counter has moved. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
 
+**Task 38.14 Phase 0 — prospective authorization of the owner-class-attribute receiver-prepend repair in `StaticWalker._bind_call_site_locals`, 2026-09-15.** Per this ADR's Two-Phase Provenance (a human-reviewer authorization must be recorded here *before* any code implementing it is written, never retroactively), this section records the prospective governance authorization for remediating the pre-existing argument-shift defect in `StaticWalker._bind_call_site_locals` for calls resolved through the `owner-class-attribute` mechanism. **Accepting reviewer:** Aniket Bhalerao — project owner/reviewer. Baseline of record: isolated review worktree `binance-ai-hedge-fund-os-task3814` at detached `HEAD = d92c590b5270f02d22fdec0aec866d9958237bbe` (commit subject: `docs(audit): authorize Task 38.13 receiver-constrained mechanism`), clean (`git diff` and `git diff --cached` both empty), with local `origin/main` and live canonical `origin refs/heads/main` at `d92c590b5270f02d22fdec0aec866d9958237bbe` (the local `main` ref at `81a9556a1aeda19cccad32a5caf87b2f1b1129f3` noted as informational). **This phase is documentation-and-governance-only:** it changes no code, no test, no evidence file, no harness counter, no gate predicate, and no `EXACT_IDENTITY_POLICY` entry.
+
+1. **Problem of record and root-cause characterization.** The defect is **pre-existing**, introduced with the binder logic in Task 38.11. In `audit_harness/trace.py`, `StaticWalker._bind_call_site_locals` prepares positional arguments for `inspect.signature(target).bind_partial(...)` to establish bound local variable types during abstract interpretation. A receiver-prepend alignment exists for calls resolved via `local-variable-type-inference`, but equivalent handling was omitted for `owner-class-attribute`. When `_resolve_target` resolves an unbound member function directly from an owner class, the AST call node contains only the explicit call arguments (`node.args`), omitting the implicit receiver (`self`). Passing these raw arguments to `bind_partial` binds parameter 0 (`self`) to argument 0 (`node.args[0]`), causing a **left-shift of all positional arguments by one slot** and dropping the trailing formal parameter. Representative case: `ServiceContainer._build(self, cls, resolver)` called at `core/container.py` as `self._build(target, resolver)`. Baseline binding erroneously binds `self <- target`, `cls <- resolver`, leaving `resolver` unassigned and `cls` bound to the resolver instance rather than the service class object, preventing downstream type specialization.
+
+2. **Reconciled canonical binder census.** Earlier prototype characterizations reported 842 total binder events and 335 `owner-class-attribute` events across a partial composition root subset. An exhaustive baseline `run_trace()` census establishes the canonical population of record: **2,837 total `_bind_call_site_locals` invocations** across 10 mechanisms: `parameter-annotation-substitution` (1,358), `owner-class-attribute` (710), `instance-attribute-type-table` (315), `global-lookup` (232), `global-or-closure-attribute` (145), `local-callable-alias` (40), `local-variable-type-inference` (30), `self-dot-class-attribute` (4), `module-attribute-chain` (2), and `runtime-instance-assertion` (1). A complete non-executing static descriptor census across all **710 `owner-class-attribute` events** classifies:
+   - **Plain Python instance functions (705 events):** 35 distinct plain-function targets across 36 `(owner_class, attr_name)` pairs. Major populations: `ServiceContainer._build` (335 events / 2 AST sites), `ServiceContainer.register` (216 events / 2 AST sites), `ServiceContainer.has` (115 events / 1 AST site), and 39 events across other classes.
+   - **Classmethods (3 events):** `traceback.StackSummary._extract_from_extended_frame_gen` (1), `enum.Enum._missing_` (1), `pydantic_settings.BaseSettings.settings_customise_sources` (1).
+   - **Staticmethods (2 events):** `pydantic_settings.BaseSettings._settings_warn_unused_config_keys` (1), `pydantic_settings.BaseSettings._settings_restore_init_kwarg_names` (1).
+   - **Properties (0 events), Custom descriptors (0 events), C method descriptors (0 events), Callable class attributes (0 events):** all 0.
+   - **Population distinction of record:** **688 baseline events** exhibit positional argument-shift symptoms (all plain instance functions with $\ge 1$ positional argument where `self` is bound to `node.args[0]`; 17 plain-function events carry zero positional arguments and do not shift). Under the tested narrow repair predicate, **502 events** are directly modified with corrected local bindings: **334** `ServiceContainer._build`, **165** `ServiceContainer.register`, **2** `dotenv.dict`, and **1** `re._parser.tell`. The ADR explicitly records that the **688 shifted baseline events** and the **502 mechanically changed events** represent distinct populations and must not be conflated.
+
+3. **Authorized repair boundary — positive static predicate.** Prospectively authorizes ONLY a narrowly guarded receiver prepend inside `StaticWalker._bind_call_site_locals` in `audit_harness/trace.py` for `mechanism == "owner-class-attribute"`. The implementation must require positive static proof via non-executing inspection (`inspect.getattr_static` / `_static_get`):
+   - **(A) Mechanism exactness:** `mechanism == "owner-class-attribute"`.
+   - **(B) AST attribute shape:** `isinstance(node.func, ast.Attribute)` and `isinstance(node.func.value, ast.Name)`.
+   - **(C) Owner class provenance:** target owner class is statically identified via `_owner_class_from_qualname(target_qn, target_mod)` or bound locals `loc.get(node.func.value.id)`.
+   - **(D) Static descriptor lookup:** raw attribute is retrieved using `inspect.getattr_static(owner_cls, node.func.attr)` without executing descriptor code.
+   - **(E) Plain function proof:** raw attribute is positively proven to be a plain Python function (`inspect.isfunction(raw_attr)`).
+   - **(F) Non-instance exclusions:** raw attribute is NOT a staticmethod or classmethod (`not isinstance(raw_attr, (staticmethod, classmethod))`).
+   - **(G) Prepend operation:** `node.func.value` is prepended to `args` before `inspect.signature(target).bind_partial(...)`.
+   - **(H) Fail-closed default:** if any condition (A)–(F) cannot be positively proven statically, `args` remains unmodified (`list(node.args)`).
+
+4. **Explicit non-authorization and descriptor exclusions.** Task 38.14 DOES NOT authorize unconditional or blind receiver prepending for `owner-class-attribute`. The following are explicitly **prohibited** from receiving an instance-receiver prepend:
+   - `staticmethod`
+   - `classmethod`
+   - `property`
+   - custom descriptors
+   - C / builtin method descriptors
+   - arbitrary callable objects stored on class attributes
+   - unknown or ambiguous descriptor types
+   - unrelated resolution mechanisms
+   - call sites where the receiver is already represented in `node.args` (no double prepend)
+   - call sites lacking sufficient static proof.
+   Over-binding is strictly prohibited; fail-closed under-resolution is preserved.
+
+5. **Non-execution requirement.** All descriptor inspection must be strictly static (`inspect.getattr_static`). Property getter bodies, custom descriptor `__get__` methods, class `__getattr__`/`__getattribute__` hooks, and metaclass hooks must **never** be executed merely to classify eligibility.
+
+6. **Counterfactual audit movement and trace-coverage expansion — disclosed.** In-memory counterfactual modeling of the narrow repair against clean published baseline `d92c590` produced the following canonical published-audit comparison:
+   - `exit_code`: **1 → 1** (delta 0)
+   - `calls_total`: **7,105 → 7,420** (delta **+315**)
+   - `calls_unresolved`: **702 → 702** (delta 0)
+   - `nodes_total`: **268 → 268** (delta 0)
+   - `nodes_unresolved`: **16 → 16** (delta 0)
+   - `identity_resolution_buckets.project_source_available`: **3,554 → 3,768** (delta **+214**)
+   - `identity_resolution_buckets.exact_identity_policy`: **2,844 → 2,945** (delta **+101**)
+   - `identity_resolution_buckets.forbidden`: **5 → 5** (delta 0)
+   - `identity_resolution_buckets.unresolved`: **702 → 702** (delta 0)
+   - `implicit_dispatch.syntax_sites_total`: **10,474 → 11,405** (delta **+931**)
+   - `implicit_dispatch.dispatch_candidates_total`: **7,012 → 7,413** (delta **+401**)
+   - `implicit_dispatch.resolved_dispatches`: **124 → 124** (delta 0)
+   - `implicit_dispatch.unresolved_dispatches`: **6,888 → 7,289** (delta **+401**)
+   - `module_state_unexplained`: **0 → 0** (delta 0).
+   *Disclosure of trace expansion:* The production runtime blast radius is zero (audit harness only; trading engine, broker integrations, network, and paper-trading safeguards are completely untouched). Audit trace coverage expands (+315 explicit calls and +401 implicit dispatch candidates) because correcting binder arguments enables the static walker to accurately specialize downstream method calls from container registrations that previously aborted due to shifted/missing types. Unresolved explicit calls remain **702**, unresolved nodes remain **16**, forbidden calls remain **5**, and `exit_code` remains **1**.
+
+7. **Task 38.13 interaction — strict attribution separation.** Task 38.14 alone resolves **0 `builtins.mappingproxy.items` calls**. When the corrected binder is modeled in combination with the separately authorized Task 38.13 receiver-constrained mechanism, **114 of the 115 `builtins.mappingproxy.items` provider-closure specializations** resolve, with 1 unspecialized root call failing closed. These 114 resolutions remain strictly attributable to Task 38.13; Task 38.14 provides binder correctness only and claims zero identity resolutions.
+
+8. **`_specialization_key` boundary.** Zero changes to `_specialization_key` in `audit_harness/trace.py` are required or authorized. Modifying `_specialization_key` under Task 38.14 Phase A is strictly prohibited.
+
+9. **Required Phase A regression and non-execution tests.** Phase A must implement a dedicated test suite (`tests/audit_harness/test_task_38_14_phase_a_binder.py`) asserting:
+   - **Positive controls:** plain Python instance functions, `ServiceContainer._build` binding `self`, `cls`, `resolver` correctly, `ServiceContainer.register`, inherited instance functions, and overridden instance functions.
+   - **Negative controls:** `staticmethod`, `classmethod`, `property`, custom descriptors, C method descriptors, callable class attributes, unknown descriptors, already-represented receivers (no double prepend), and unrelated mechanisms (`local-variable-type-inference` behavior preserved).
+   - **Non-execution controls:** hostile property getters and custom descriptor `__get__` methods do not execute during static classification.
+   - **Regression & counter pinning:** canonical census of 2,837 total / 710 `owner-class-attribute` / 705 plain functions / 3 classmethods / 2 staticmethods, 502 directly modified events, published audit counter movement (+315 calls, +214 project source available, +101 exact identity policy, 0 unresolved delta), and zero change to `_specialization_key`.
+
+10. **Two-Phase Provenance durability — publication required before Phase A.** An authorization is prospective only if it is durable and externally verifiable on `origin/main` before implementation begins. This Phase 0 record must be **(1) committed** and **(2) durably pushed to canonical `origin/main`** before any Task 38.14 Phase A code or test is written. A local, uncommitted edit or unpublished local commit is void under this ADR's never-retroactively rule. Phase A does not begin in this task.
+
+**Non-goals — explicitly outside this authorization.** No `EXACT_IDENTITY_POLICY` modification and no policy version bump (`2026-09-05.1`, 87 entries unchanged); no authorization of `builtins.mappingproxy.items` (Task 38.13 governed separately); no change to `audit_harness/` or `tests/` in Phase 0; no implementation code or tests in this task; no modification of `_specialization_key`; no M-8 or M-9 remediation; no Task 39 work; no production code changes; and **no attempt to clear the gate**.
+
+**Gate outcome: HOLD, unchanged.** This record runs no harness against modified code, implements nothing, and clears no gate predicate. Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on the committed figures of record: `nodes_unresolved=16`, `calls_unresolved=702`, `implicit_dispatch.unresolved_dispatches=6888`; `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.14 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
+
 
 ## Alternatives Considered
 - **No formal gate — treat the audit as informational only.** Rejected: an audit whose findings carry no consequence is easy to produce and easy to ignore; the entire point of running a structural audit before Task 39 is to make its outcome actionable.
