@@ -469,6 +469,59 @@ Phase 0 projected `calls_unresolved` 901 → **702** (−199) with every other c
 **Gate outcome: HOLD, unchanged.** This record runs no harness against modified code, implements nothing, and clears no gate predicate. Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on the committed figures of record: `nodes_unresolved=16`, `calls_unresolved=702`, `implicit_dispatch.unresolved_dispatches=6888`; `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.14 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
 
 
+**Task 38.14 Corrective Phase 0.2 — prospective authorization of the safe non-executing descriptor inspection repair, 2026-09-15.** Per this ADR's Two-Phase Provenance (a human-reviewer authorization must be recorded here *before* any code implementing it is written, never retroactively), this section records the prospective governance authorization for correcting two non-execution defects identified in the published Task 38.14 Phase A binder repair. **Accepting reviewer:** Aniket Bhalerao — project owner/reviewer. Baseline of record: isolated review worktree `binance-ai-hedge-fund-os-task3814` at published canonical commit `0675ece5cd6d9d12cae1f0fcc555c202f387f7ec`, clean (`git diff` and `git diff --cached` both empty). **This phase is documentation-and-governance-only:** it changes no code, no test, no evidence file, no harness counter, no gate predicate, and no `EXACT_IDENTITY_POLICY` entry.
+
+1. **Defects of record in published Task 38.14 Phase A.** Post-publish non-execution audit of `0675ece5cd6d9d12cae1f0fcc555c202f387f7ec` identified two code paths where arbitrary Python execution or dynamic hook evaluation can occur during static analysis:
+   - **Defect 1 (Metaclass `__getattribute__` execution via `inspect.getattr_static` in `_bind_call_site_locals`):** In `audit_harness/trace.py:1278`, `inspect.getattr_static(owner_cls, node.func.attr)` iterates over `_shadowed_dict(entry)` for `entry` in `owner_cls.__mro__`. In standard CPython, `getattr_static` attempts to fetch `entry.__dict__`. For classes with a custom metaclass defining `__getattribute__` (e.g., `class Meta(type): def __getattribute__(self, name): ...`), accessing `entry.__dict__` dispatches through `type(entry).__getattribute__(entry, "__dict__")`, executing arbitrary metaclass Python code.
+   - **Defect 2 (Module-level `__getattr__`/`__getattribute__` execution in `_owner_class_from_qualname`):** In `audit_harness/trace.py:291`, `candidate = getattr(mod, owner_name, None)` invokes dynamic attribute lookup on module objects `mod`, which triggers module-level `__getattr__` (PEP 562) or custom `ModuleType.__getattribute__` hooks when present on hostile or dynamic modules.
+
+2. **Authorized non-executing safe primitives.** Prospectively authorizes replacing both defective paths with zero-execution CPython descriptor getters:
+   - **(A) Direct C-slot type attribute lookup (`_safe_raw_class_attribute`):** Reads `PyTypeObject.tp_mro` directly using `type.__dict__["__mro__"].__get__(owner_cls)` and reads each class's `PyTypeObject.tp_dict` directly using `type.__dict__["__dict__"].__get__(entry)`. Because `type.__dict__["__dict__"]` is CPython's native `getset_descriptor` for `tp_dict`, invoking its `__get__` slot extracts the raw `mappingproxy` without executing metaclass `__getattribute__` or `__getattr__`. Attribute membership is evaluated via `attr in d` (dictionary hash lookup) and returns `d[attr]` directly, bypassing all descriptor `__get__` methods.
+   - **(B) Non-executing module inspection (`_safe_owner_class_from_qualname`):** Reads module dictionaries directly via `types.ModuleType.__dict__["__dict__"].__get__(mod)` and AST receiver provenance (`loc.get(...)`, `local_var_types`) without invoking `getattr()`, eliminating module `__getattr__` and `__getattribute__` execution.
+
+3. **Hostile non-execution characterization and safety matrix.** The authorized safe primitives were characterized across the exhaustive hostile safety matrix, confirming zero execution across all cases:
+   - **Metaclass `__getattribute__`**: Class with custom metaclass overriding `__getattribute__` (raising `HostileMetaGetattributeExecuted` on any attribute or `__dict__` access) — **0 arbitrary executions** (bypassed via `type.__dict__["__dict__"].__get__`).
+   - **Metaclass `__getattr__`**: Class with custom metaclass overriding `__getattr__` (raising `HostileMetaGetattrExecuted`) — **0 arbitrary executions** (bypassed via direct `tp_dict` mappingproxy lookup).
+   - **Module `__getattribute__`**: Module with custom `ModuleType.__getattribute__` hook (raising `HostileModuleGetattributeExecuted`) — **0 arbitrary executions** (bypassed via `types.ModuleType.__dict__["__dict__"].__get__`).
+   - **Module `__getattr__`**: Module with PEP 562 module-level `__getattr__` hook (raising `HostileModuleGetattrExecuted`) — **0 arbitrary executions** (bypassed via direct module dict lookup).
+   - **Property getter**: Class with `@property` getter raising `HostilePropertyExecuted` — **0 arbitrary executions** (raw property descriptor extracted without invoking getter).
+   - **Custom descriptor `__get__`**: Class with custom descriptor whose `__get__` raises `HostileDescriptorExecuted` — **0 arbitrary executions** (raw descriptor extracted without evaluating descriptor protocol).
+   - **Callable class attribute**: Class with non-function callable instance or callable object attribute — **0 arbitrary executions** (raw attribute extracted without invocation).
+   - **Hostile `__bool__` / `__len__`**: Hostile classes or objects defining `__bool__` or `__len__` hooks raising `HostileBoolExecuted` or `HostileLenExecuted` on truthiness/falsiness or length checks — **0 arbitrary executions** (direct descriptor extraction and `attr in d` hash lookup evaluate no boolean or collection length hooks).
+   - **Additional controls (Class-instance `__getattr__` / `__getattribute__`)**: Class defining instance-level `__getattr__` / `__getattribute__` hooks raising `HostileGetattrExecuted` / `HostileGetattributeExecuted` — **0 arbitrary executions**.
+   Across all safety matrix probes, exactly **0 arbitrary code executions** occur under the authorized safe primitives (100% non-executing static guarantee).
+
+4. **Reconciled canonical audit census and counter invariance.** In-memory counterfactual modeling of the safe non-executing lookup against the canonical audit universe confirms complete numerical invariance across all 26 schema fields:
+   - Canonical `owner-class-attribute` binding count: **710** (705 plain Python instance functions, 3 classmethods, 2 staticmethods, 0 properties, 0 custom descriptors, 0 C method descriptors, 0 callable class attributes). The figure of 711 in previous test drafts reflected 1 synthetic test fixture call site (`FixturePositiveChild.caller_instance_method`) and is reconciled to the canonical production count of 710.
+   - Canonical `calls_unresolved`: **702** (the 718 figure from earlier test drafts included 16 synthetic unresolved calls from experimental fixture runs).
+   - Canonical published audit metrics under corrective repair:
+     - `calls_total`: **7,420** (+315 over baseline 7,105)
+     - `calls_unresolved`: **702** (0 delta)
+     - `nodes_total`: **268** (0 delta)
+     - `nodes_unresolved`: **16** (0 delta)
+     - `identity_resolution_buckets.project_source_available`: **3,768** (+214)
+     - `identity_resolution_buckets.exact_identity_policy`: **2,945** (+101)
+     - `identity_resolution_buckets.forbidden`: **5** (0 delta)
+     - `identity_resolution_buckets.unresolved`: **702** (0 delta)
+     - `implicit_dispatch.syntax_sites_total`: **11,405** (+931)
+     - `implicit_dispatch.dispatch_candidates_total`: **7,413** (+401)
+     - `implicit_dispatch.resolved_dispatches`: **124** (0 delta)
+     - `implicit_dispatch.unresolved_dispatches`: **7,289** (+401)
+     - `module_state_unexplained`: **0** (0 delta)
+     - `exit_code`: **1** (0 delta)
+   - Zero under-resolution: Every one of the 705 canonical plain-function bindings (including 335 `_build`, 216 `register`, 115 `has`) is preserved exactly under the safe primitive.
+
+5. **Phase A implementation and test requirements.** Phase A is authorized to:
+   - Update `audit_harness/trace.py` to implement `_safe_raw_class_attribute` and `_safe_owner_class_from_qualname`.
+   - Update `tests/audit_harness/test_task_38_14_phase_a_binder.py` to assert the complete 8-probe hostile non-execution matrix alongside positive controls, negative controls, and canonical counter pinning.
+
+6. **Two-Phase Provenance durability — publication required before Phase A.** This Phase 0.2 prospective authorization must be committed and pushed to canonical remote before any corrective Phase A implementation or test code is modified.
+
+**Non-goals — explicitly outside this authorization.** No `EXACT_IDENTITY_POLICY` modification and no policy version bump (`2026-09-05.1`, 87 entries unchanged); no `_specialization_key` modification; no Task 38.13 implementation; no M-8 or M-9 remediation; no Task 39 work; no production code changes; and **no attempt to clear the gate**.
+
+**Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on the committed figures of record: `nodes_unresolved=16`, `calls_unresolved=702`, `implicit_dispatch.unresolved_dispatches=6888` (baseline) / `7289` (post-repair); `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.14 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
+
+
 ## Alternatives Considered
 - **No formal gate — treat the audit as informational only.** Rejected: an audit whose findings carry no consequence is easy to produce and easy to ignore; the entire point of running a structural audit before Task 39 is to make its outcome actionable.
 - **Gate on any open finding, regardless of severity.** Rejected: with 9 Low findings already on record (mostly `baseline: unknown` typing gaps and test-coverage notes), gating on every open item would block indefinitely on cosmetic issues unrelated to safety. The severity rubric exists precisely so the gate tracks what actually matters — a real reachable I/O/trading/inference/credential-leak path.
