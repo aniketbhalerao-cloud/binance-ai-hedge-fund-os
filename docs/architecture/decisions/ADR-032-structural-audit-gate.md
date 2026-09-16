@@ -522,6 +522,78 @@ Phase 0 projected `calls_unresolved` 901 → **702** (−199) with every other c
 **Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on the committed figures of record: `nodes_unresolved=16`, `calls_unresolved=702`, `implicit_dispatch.unresolved_dispatches=6888` (baseline) / `7289` (post-repair); `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.14 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
 
 
+**Task 38.13 Corrective Phase 0.2 — prospective authorization of the safe non-executing specialization-key repair, 2026-09-16.** Per this ADR's Two-Phase Provenance (a human-reviewer authorization must be durably published here *before* any authoritative implementation is created, staged, or committed, never retroactively), this section records the prospective governance authorization for correcting a non-execution defect in `StaticWalker._specialization_key` discovered during Task 38.13 reconciliation. **Accepting reviewer:** Aniket Bhalerao — project owner/reviewer. Baseline of record: isolated governance worktree `binance-ai-hedge-fund-os-task3813-gov` at published canonical commit `9fd3b7df986d30ecc6fdc16865fbbb71acaf1f88` (the commit incorporating Task 38.14 Phase 0.2 non-executing descriptor repairs), clean (`git diff` and `git diff --cached` both empty). **This phase is documentation-and-governance-only:** it changes no code, no test, no evidence file, no harness counter, no gate predicate, and no `EXACT_IDENTITY_POLICY` entry.
+
+**Provenance of record and prototype disposition.** During defect characterization, an unstaged, uncommitted exploratory prototype of the `_specialization_key` repair was created in the isolated `/Users/aniketbhalerao/binance-ai-hedge-fund-os-task3813-reconcile` worktree to confirm the defect mechanism and verify the non-executing descriptor behavior in memory. That prototype predates this prospective authorization. Under ADR-032's never-retroactive Two-Phase Provenance rule, that pre-authorization exploratory prototype is **NON-AUTHORITATIVE** and is **NOT eligible to be staged, committed, pushed, or reused as the durable Phase A implementation**. It remains preserved read-only solely as characterization/evidence. This Phase 0.2 authorization applies strictly prospectively to a NEW implementation created/reconciled only AFTER this governance authorization is durably published to canonical `origin/main`. After publication, Phase A must begin from a fresh worktree based on the new governance commit. The authorized repair may reproduce the characterized behavior, but it must be freshly implemented/reconciled and independently validated against the published governance baseline; the pre-existing exploratory prototype is not retroactively authorized.
+
+1. **Defect of record and reachability.** In `audit_harness/trace.py:1498` (baseline `9fd3b7d`), `StaticWalker._specialization_key.ident(value)` computes string representations for specialization keys using ordinary `getattr(value, "__module__", None)` and `getattr(value, "__qualname__", None)`. For any `value` that is a Python `type` whose metaclass `type(value)` overrides `__getattribute__` (or inherits a custom `__getattribute__` across its metaclass MRO), `getattr` dispatches through `metaclass.__getattribute__(value, "__module__")` and `metaclass.__getattribute__(value, "__qualname__")`, executing arbitrary user Python during static AST analysis. This defect is reachable during standard static analysis whenever `StaticWalker.walk` encounters a specialized call site (such as `ServiceContainer._build` with `forced_locals={"cls": HostileSubject}`) and instantiates a specialized child walker. Read-only in-memory characterization confirmed:
+   - Hostile metaclass overriding `__getattribute__`: **2 arbitrary executions** (`__module__` execution, `__qualname__` execution; total 2 arbitrary executions) under baseline `getattr`.
+   - Inherited hostile metaclass `__getattribute__`: **2 arbitrary executions** under baseline `getattr`.
+   - Proposed direct type slot reads: **0 arbitrary executions**.
+
+2. **Prior governance conflict and scope correction.** Prior Task 38.13 Phase 0 authorization (line 398: "no key specialization (_specialization_key unchanged)") and Task 38.14 Phase 0 / Phase 0.2 authorizations (lines 457, 467, 520: "Zero changes to _specialization_key in audit_harness/trace.py are required or authorized") explicitly prohibited modifying `_specialization_key`. This section formally records a **NEW prospective safety authorization** for `_specialization_key` to eliminate the arbitrary execution hazard, rather than reinterpreting prior task boundaries.
+
+3. **Authorized repair boundary — direct type descriptor extraction.** Prospectively authorizes ONLY:
+   - For class/type values (`isinstance(value, type)`) inside `StaticWalker._specialization_key.ident()`:
+     - Read `__module__` directly via `type.__dict__["__module__"].__get__(value)` (`_type_module_get`).
+     - Read `__qualname__` directly via `type.__dict__["__qualname__"].__get__(value)` (`_type_qualname_get`).
+     - Perform no ordinary `getattr()` or `hasattr()` on class values.
+     - Fail closed on descriptor extraction failure (catch `Exception` -> fallback to `None` / `repr(type(value))`).
+   - For non-class values: preserve existing `getattr(value, "__module__", None)` and `getattr(value, "__qualname__", None)` behavior unless separately authorized.
+   - No broader specialization-key redesign or semantic changes.
+
+4. **Preservation of Task 38.13 proof repair and non-executing invariants.** The implementation is authorized to retain the characterized non-executing Task 38.13 proof corrections:
+   - Presence-aware `_MISSING` sentinel distinguishing absent attributes from attributes explicitly set to `None` in `_safe_raw_class_attribute`.
+   - Direct C-slot MRO and dict extraction (`_type_mro_get`, `_type_dict_get`).
+   - Strict subject-level `__signature__` rejection.
+   - Strict metaclass-level `__signature__`, `__getattr__`, custom `__getattribute__`, and custom `__call__` rejection across the entire metaclass MRO (`_is_safe_metaclass`).
+   - `inspect.signature(subject)` invoked ONLY after positive safety gates pass.
+   - All receiver proof obligations (A)–(G) unchanged.
+   - Global `builtins.mappingproxy.items` policy addition remains firmly REJECTED.
+
+5. **Required Phase A regression and non-execution test obligations.** Phase A must provide regression tests proving:
+   - Hostile metaclass `__getattribute__` produces **0 arbitrary executions** and fails closed to `unresolved`.
+   - Inherited hostile metaclass `__getattribute__` produces **0 arbitrary executions** and fails closed to `unresolved`.
+   - Hostile metaclass `__getattr__` produces **0 arbitrary executions** and fails closed to `unresolved`.
+   - Normal classes produce identical specialization keys.
+   - Existing specialization cache semantics and key uniqueness are preserved.
+   - Task 38.13 functional 114-site movement remains unchanged.
+   - Task 38.14 non-execution tests (`test_task_38_14_phase_a_binder.py`) remain completely green.
+
+6. **Reconciled canonical residual census and functional movement.**
+   - **Specialization Grain (115 total `mappingproxy.items` calls):**
+     - **114 resolved** (`exact_identity_policy` with `inspect-signature-parameters-mappingproxy-items` rationale across the 114 specialized provider classes in `ServiceContainer._build`).
+     - **1 unresolved** (the unspecialized `ServiceContainer._build` root where `cls` is an unbound parameter and fails closed).
+   - **Trace-Record Grain (230 total calls matching `parameters.items`):**
+     - **114 resolved** (`exact_identity_policy` direct calls on specialized providers).
+     - **116 unresolved** (115 `signature.parameters.items [__get__]` descriptor lookups + 1 direct call on unspecialized root).
+   - **Canonical published audit movement (projected under Phase A implementation):**
+     - `calls_total`: **7,420 → 7,420** (delta 0)
+     - `calls_unresolved`: **702 → 588** (delta **-114**)
+     - `identity_resolution_buckets.exact_identity_policy`: **2,945 → 3,059** (delta **+114**)
+     - `identity_resolution_buckets.project_source_available`: **3,768 → 3,768** (delta 0)
+     - `identity_resolution_buckets.forbidden`: **5 → 5** (delta 0)
+     - `identity_resolution_buckets.unresolved`: **702 → 588** (delta **-114**)
+     - `nodes_total`: **268 → 268** (delta 0)
+     - `nodes_unresolved`: **16 → 16** (delta 0)
+     - `module_state_unexplained`: **0 → 0** (delta 0)
+     - `exit_code`: **1 → 1** (delta 0).
+
+7. **Two-Phase Provenance durability and mandatory execution sequence.** An authorization is prospective only if it is durable and externally verifiable on `origin/main` before implementation begins. A local, uncommitted edit or unpublished local commit is void under this ADR's never-retroactively rule. The mandatory progression order is strictly enforced:
+   1. **Author governance:** Record this Phase 0.2 prospective authorization in ADR-032.
+   2. **Stage governance separately:** Stage only ADR-032 in the governance worktree (`git add docs/architecture/decisions/ADR-032-structural-audit-gate.md`).
+   3. **Commit governance:** Create a governance-only commit containing only the ADR changes.
+   4. **Push and verify canonical publication:** Push the governance commit to `origin/main` and verify durable publication.
+   5. **Create fresh post-authorization Task 38.13 implementation worktree:** Branch a fresh worktree directly from the published governance commit on `origin/main`.
+   6. **Implement/reconcile the authorized Phase A changes:** Implement the authorized non-executing changes freshly in the new worktree. The pre-existing exploratory prototype in `/Users/aniketbhalerao/binance-ai-hedge-fund-os-task3813-reconcile` must NEVER be staged or committed.
+   7. **Test and evidence review:** Execute the complete test suite and record audit metrics independently against the published baseline.
+   8. **Stage implementation:** Only after all previous steps are satisfied may Phase A implementation changes be staged for review.
+
+**Non-goals — explicitly outside this authorization.** No `EXACT_IDENTITY_POLICY` modification and **specifically no `builtins.mappingproxy.items` key**; no policy version bump (`2026-09-05.1`, 87 entries unchanged); no general `_specialization_key` redesign; no production or trading code changes; no M-8 or M-9 remediation; no Task 39 work; and **no attempt to clear the gate**.
+
+**Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on the committed figures of record: `nodes_unresolved=16`, `calls_unresolved=702` (baseline) / `588` (post-repair), `implicit_dispatch.unresolved_dispatches=7289`; `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.13 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
+
+
 ## Alternatives Considered
 - **No formal gate — treat the audit as informational only.** Rejected: an audit whose findings carry no consequence is easy to produce and easy to ignore; the entire point of running a structural audit before Task 39 is to make its outcome actionable.
 - **Gate on any open finding, regardless of severity.** Rejected: with 9 Low findings already on record (mostly `baseline: unknown` typing gaps and test-coverage notes), gating on every open item would block indefinitely on cosmetic issues unrelated to safety. The severity rubric exists precisely so the gate tracks what actually matters — a real reachable I/O/trading/inference/credential-leak path.
