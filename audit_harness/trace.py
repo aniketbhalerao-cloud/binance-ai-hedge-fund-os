@@ -279,7 +279,32 @@ def _underlying(func: object) -> object:
     return getattr(unbound, "__wrapped__", unbound)
 
 
-def _owner_class_from_qualname(
+_type_mro_get = type.__dict__["__mro__"].__get__
+_type_dict_get = type.__dict__["__dict__"].__get__
+_module_dict_get = types.ModuleType.__dict__["__dict__"].__get__
+
+
+def _safe_raw_class_attribute(cls: type, attr: str) -> object | None:
+    """Extracts a raw attribute from a class's MRO using direct CPython C-slot
+    descriptor getters without executing metaclass __getattribute__/__getattr__,
+    property getters, or descriptor __get__ methods."""
+    if not isinstance(cls, type):
+        return None
+    try:
+        mro = _type_mro_get(cls)
+    except Exception:
+        return None
+    for entry in mro:
+        try:
+            d = _type_dict_get(entry)
+        except Exception:
+            continue
+        if attr in d:
+            return d[attr]
+    return None
+
+
+def _safe_owner_class_from_qualname(
     qualname: str, module_name: str | None
 ) -> type | None:
     """The real owning class for a resolved target's qualname -- e.g.
@@ -289,19 +314,41 @@ def _owner_class_from_qualname(
     ``<locals>``-nested target: the *last* dot sits between
     ``<locals>`` and the nested name, not between the class and its
     method, so a naive split would try (and fail) to ``getattr`` a
-    literal ``"...​<locals>"`` attribute name. Task 38.7 Category E: this
+    literal ``"...<locals>"`` attribute name. Task 38.7 Category E: this
     is exactly the shape a provider lambda's own qualname has, and
     fixing this general case is what actually lets that lambda's own
     ``self.<attr>`` calls resolve, no per-lambda AST relocation needed --
     the walker was simply never given the right owner_class to begin
-    with."""
+    with.
+
+    Uses direct ModuleType base descriptor inspection to avoid dynamic
+    module-level getattr / __getattr__ (PEP 562) execution."""
     head = qualname.split(".<locals>.")[0]
     if "." not in head:
         return None
     owner_name = head.rsplit(".", 1)[0]
     mod = sys.modules.get(module_name) if module_name is not None else None
-    candidate = getattr(mod, owner_name, None) if mod else None
-    return candidate if inspect.isclass(candidate) else None
+    if mod is None or not isinstance(mod, types.ModuleType):
+        return None
+    try:
+        mod_dict = _module_dict_get(mod)
+    except Exception:
+        return None
+
+    parts = owner_name.split(".")
+    if parts[0] not in mod_dict:
+        return None
+    candidate = mod_dict[parts[0]]
+    for part in parts[1:]:
+        if not isinstance(candidate, type):
+            return None
+        candidate = _safe_raw_class_attribute(candidate, part)
+        if candidate is None:
+            return None
+    return candidate if isinstance(candidate, type) else None
+
+
+_owner_class_from_qualname = _safe_owner_class_from_qualname
 
 
 def _local_helper_names(tree: ast.Module) -> frozenset[str]:
@@ -1254,10 +1301,11 @@ class StaticWalker:
             and node.func.value.id in local_var_types
         ):
             receiver_type = local_var_types[node.func.value.id]
-            try:
-                raw_attr = inspect.getattr_static(receiver_type, node.func.attr)
-            except AttributeError:
-                raw_attr = None
+            raw_attr = (
+                _safe_raw_class_attribute(receiver_type, node.func.attr)
+                if isinstance(receiver_type, type)
+                else None
+            )
             if inspect.isfunction(raw_attr):
                 args = [node.func.value, *args]
         elif (
@@ -1267,16 +1315,13 @@ class StaticWalker:
         ):
             target_qn = getattr(target, "__qualname__", "")
             target_mod = getattr(target, "__module__", None)
-            owner_cls = _owner_class_from_qualname(target_qn, target_mod)
+            owner_cls = _safe_owner_class_from_qualname(target_qn, target_mod)
             if owner_cls is None:
                 rec_val = loc.get(node.func.value.id)
                 if rec_val is not None:
-                    owner_cls = rec_val if inspect.isclass(rec_val) else type(rec_val)
-            if owner_cls is not None:
-                try:
-                    raw_attr = inspect.getattr_static(owner_cls, node.func.attr)
-                except AttributeError:
-                    raw_attr = None
+                    owner_cls = rec_val if isinstance(rec_val, type) else type(rec_val)
+            if owner_cls is not None and isinstance(owner_cls, type):
+                raw_attr = _safe_raw_class_attribute(owner_cls, node.func.attr)
                 if inspect.isfunction(raw_attr) and not isinstance(
                     raw_attr, (staticmethod, classmethod)
                 ):

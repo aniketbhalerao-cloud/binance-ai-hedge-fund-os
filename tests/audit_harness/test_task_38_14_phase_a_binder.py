@@ -7,17 +7,31 @@ Verifies:
 2. Negative controls: staticmethods, classmethods, properties, custom
    descriptors, C method descriptors, callable attributes, ambiguous descriptors,
    double prepends, and unrelated mechanisms remain unchanged (fail-closed).
-3. Non-execution controls: static inspection uses getattr_static and never
-   invokes property getters, descriptor __get__ methods, __getattr__, or
-   __getattribute__ hooks.
+3. Non-execution controls: static inspection uses safe CPython descriptor
+   getters and never invokes:
+   - Hostile metaclass __getattribute__
+   - Hostile metaclass __getattr__
+   - Hostile module __getattribute__
+   - Hostile module __getattr__ (PEP 562)
+   - Property getters
+   - Descriptor __get__ methods
+   - Callable class attribute invocations
+   - Hostile __bool__ / __len__ hooks
+   - Instance __getattr__ / __getattribute__ hooks
 """
 
 import ast
 import inspect
+import sys
 import types
 import pytest
 
-from audit_harness.trace import StaticWalker, _owner_class_from_qualname
+from audit_harness.trace import (
+    StaticWalker,
+    _owner_class_from_qualname,
+    _safe_raw_class_attribute,
+    _safe_owner_class_from_qualname,
+)
 
 
 # --- Fixtures / Test classes for Positive Controls ---
@@ -108,7 +122,6 @@ class CallableAttr:
 
 
 class UnknownDescriptor:
-    # Non-function attribute behaving unexpectedly
     pass
 
 
@@ -126,13 +139,41 @@ class FixtureNegativeDescriptors:
         self.custom_desc(helper)  # type: ignore[operator]
 
 
-# --- Fixtures / Test classes for Non-Execution Controls ---
+# --- Hostile Exception Classes for Non-Execution Controls ---
+
+class HostileMetaGetattributeExecuted(Exception):
+    pass
+
+
+class HostileMetaGetattrExecuted(Exception):
+    pass
+
+
+class HostileModuleGetattributeExecuted(Exception):
+    pass
+
+
+class HostileModuleGetattrExecuted(Exception):
+    pass
+
 
 class HostilePropertyExecuted(Exception):
     pass
 
 
 class HostileDescriptorExecuted(Exception):
+    pass
+
+
+class HostileCallableExecuted(Exception):
+    pass
+
+
+class HostileBoolExecuted(Exception):
+    pass
+
+
+class HostileLenExecuted(Exception):
     pass
 
 
@@ -144,13 +185,86 @@ class HostileGetattributeExecuted(Exception):
     pass
 
 
+# --- Hostile Fixtures ---
+
 class HostileDescriptor:
+    def __init__(self) -> None:
+        self.exec_count = 0
+
     def __get__(self, instance: object, owner: type | None = None) -> object:
+        self.exec_count += 1
         raise HostileDescriptorExecuted("Hostile descriptor __get__ was executed!")
+
+
+class HostileCallable:
+    def __init__(self) -> None:
+        self.exec_count = 0
+
+    def __call__(self, *args: object, **kwargs: object) -> None:
+        self.exec_count += 1
+        raise HostileCallableExecuted("Hostile callable object was executed!")
+
+
+class HostileMetaGetattribute(type):
+    def __getattribute__(self, name: str) -> object:
+        raise HostileMetaGetattributeExecuted(
+            f"Hostile metaclass __getattribute__ executed for {name}!"
+        )
+
+
+class HostileMetaGetattr(type):
+    def __getattr__(self, name: str) -> object:
+        raise HostileMetaGetattrExecuted(
+            f"Hostile metaclass __getattr__ executed for {name}!"
+        )
+
+
+class HostileMetaBoolLen(type):
+    def __bool__(self) -> bool:
+        raise HostileBoolExecuted("Hostile metaclass __bool__ was executed!")
+
+    def __len__(self) -> int:
+        raise HostileLenExecuted("Hostile metaclass __len__ was executed!")
+
+
+class HostileClassWithHostileMetaGetattribute(metaclass=HostileMetaGetattribute):
+    def target_method(self, helper: object) -> None:
+        helper.marker()  # type: ignore[attr-defined]
+
+
+class HostileClassWithHostileMetaGetattr(metaclass=HostileMetaGetattr):
+    def target_method(self, helper: object) -> None:
+        helper.marker()  # type: ignore[attr-defined]
+
+
+class HostileClassWithHostileBoolLen(metaclass=HostileMetaBoolLen):
+    def target_method(self, helper: object) -> None:
+        helper.marker()  # type: ignore[attr-defined]
+
+    def __bool__(self) -> bool:
+        raise HostileBoolExecuted("Hostile class instance __bool__ was executed!")
+
+    def __len__(self) -> int:
+        raise HostileLenExecuted("Hostile class instance __len__ was executed!")
+
+
+class HostileModuleGetattribute(types.ModuleType):
+    def __getattribute__(self, name: str) -> object:
+        raise HostileModuleGetattributeExecuted(
+            f"Hostile module __getattribute__ executed for {name}!"
+        )
+
+
+class HostileModuleGetattr(types.ModuleType):
+    def __getattr__(self, name: str) -> object:
+        raise HostileModuleGetattrExecuted(
+            f"Hostile module __getattr__ executed for {name}!"
+        )
 
 
 class FixtureHostileClass:
     hostile_desc = HostileDescriptor()
+    hostile_callable = HostileCallable()
 
     @property
     def hostile_prop(self) -> str:
@@ -301,9 +415,10 @@ def test_negative_property_descriptor_fail_closed() -> None:
         args=[],
         keywords=[],
     )
+    raw_prop = _safe_raw_class_attribute(FixtureNegativeDescriptors, "my_property")
     bound = walker._bind_call_site_locals(
         call_node,
-        getattr(FixtureNegativeDescriptors, "my_property"),
+        raw_prop,
         g={},
         loc={"self": FixtureNegativeDescriptors()},
         local_var_types=None,
@@ -412,7 +527,6 @@ def test_negative_no_double_prepend() -> None:
     """Negative control 13: Calling an unbound method directly with explicit receiver
     must not prepend a second receiver."""
     walker = StaticWalker()
-    # Explicit call: Base.instance_two_arg(self, "arg1", helper)
     call_node = ast.Call(
         func=ast.Attribute(
             value=ast.Name(id="FixturePositiveBase", ctx=ast.Load()),
@@ -426,7 +540,6 @@ def test_negative_no_double_prepend() -> None:
         ],
         keywords=[],
     )
-    # Target obtained via global lookup of FixturePositiveBase.instance_two_arg
     child_inst = FixturePositiveChild()
     helper_inst = FixtureHelper()
     bound = walker._bind_call_site_locals(
@@ -494,12 +607,108 @@ def test_negative_local_var_type_inference_preserved() -> None:
 
 
 # ==============================================================================
-# Non-Execution Controls
+# Non-Execution Hostile Probes (All 8 Required Probes + Additional Controls)
 # ==============================================================================
 
-def test_non_execution_hostile_property_getter() -> None:
-    """Non-execution control 16: Hostile property getter is not executed
-    during _bind_call_site_locals classification."""
+def test_hostile_probe_1_metaclass_getattribute() -> None:
+    """Hostile Probe 1: Metaclass __getattribute__ override raising on any access
+    must result in 0 arbitrary executions during safe attribute lookup."""
+    attr = _safe_raw_class_attribute(
+        HostileClassWithHostileMetaGetattribute, "target_method"
+    )
+    assert inspect.isfunction(attr)
+
+    walker = StaticWalker()
+    call_node = ast.Call(
+        func=ast.Attribute(
+            value=ast.Name(id="self", ctx=ast.Load()),
+            attr="target_method",
+            ctx=ast.Load(),
+        ),
+        args=[ast.Name(id="helper", ctx=ast.Load())],
+        keywords=[],
+    )
+    helper = FixtureHelper()
+    bound = walker._bind_call_site_locals(
+        call_node,
+        attr,
+        g={},
+        loc={
+            "self": HostileClassWithHostileMetaGetattribute,
+            "helper": helper,
+        },
+        local_var_types=None,
+        mechanism="owner-class-attribute",
+    )
+    assert bound == {
+        "self": HostileClassWithHostileMetaGetattribute,
+        "helper": helper,
+    }
+
+
+def test_hostile_probe_2_metaclass_getattr() -> None:
+    """Hostile Probe 2: Metaclass __getattr__ override raising on missing attributes
+    must result in 0 arbitrary executions during safe attribute lookup."""
+    attr = _safe_raw_class_attribute(
+        HostileClassWithHostileMetaGetattr, "target_method"
+    )
+    assert inspect.isfunction(attr)
+    missing = _safe_raw_class_attribute(
+        HostileClassWithHostileMetaGetattr, "nonexistent_attr"
+    )
+    assert missing is None
+
+
+def test_hostile_probe_3_module_getattribute() -> None:
+    """Hostile Probe 3: Module with custom ModuleType.__getattribute__ raising on
+    any access must result in 0 arbitrary executions during qualname resolution."""
+    mod_name = "test_hostile_module_getattribute_pkg"
+    hmod = HostileModuleGetattribute(mod_name)
+    mod_dict = types.ModuleType.__dict__["__dict__"].__get__(hmod)
+    mod_dict["TargetClass"] = HostileClassWithHostileMetaGetattribute
+    sys.modules[mod_name] = hmod
+    try:
+        resolved = _safe_owner_class_from_qualname(
+            "TargetClass.target_method.<locals>.<lambda>", mod_name
+        )
+        assert resolved is HostileClassWithHostileMetaGetattribute
+    finally:
+        sys.modules.pop(mod_name, None)
+
+
+def test_hostile_probe_4_module_getattr() -> None:
+    """Hostile Probe 4: Module with PEP 562 __getattr__ hook raising on missing
+    names must result in 0 arbitrary executions during qualname resolution."""
+    mod_name = "test_hostile_module_getattr_pkg"
+    hmod = types.ModuleType(mod_name)
+    mod_dict = types.ModuleType.__dict__["__dict__"].__get__(hmod)
+
+    def hostile_getattr(name: str) -> object:
+        raise HostileModuleGetattrExecuted(f"Module __getattr__ executed for {name}!")
+
+    mod_dict["__getattr__"] = hostile_getattr
+    mod_dict["ExistingClass"] = FixturePositiveBase
+    sys.modules[mod_name] = hmod
+    try:
+        resolved = _safe_owner_class_from_qualname(
+            "ExistingClass.instance_two_arg.<locals>.<lambda>", mod_name
+        )
+        assert resolved is FixturePositiveBase
+
+        nonexistent = _safe_owner_class_from_qualname(
+            "NonexistentClass.method.<locals>.<lambda>", mod_name
+        )
+        assert nonexistent is None
+    finally:
+        sys.modules.pop(mod_name, None)
+
+
+def test_hostile_probe_5_property_getter() -> None:
+    """Hostile Probe 5: Property getter raising HostilePropertyExecuted must
+    not be executed during static inspection."""
+    raw_attr = _safe_raw_class_attribute(FixtureHostileClass, "hostile_prop")
+    assert isinstance(raw_attr, property)
+
     walker = StaticWalker()
     call_node = ast.Call(
         func=ast.Attribute(
@@ -510,12 +719,9 @@ def test_non_execution_hostile_property_getter() -> None:
         args=[],
         keywords=[],
     )
-    # Target obtained via inspect.getattr_static or class dict to avoid triggering getter
-    target = inspect.getattr_static(FixtureHostileClass, "hostile_prop")
-    # Must not raise HostilePropertyExecuted
     bound = walker._bind_call_site_locals(
         call_node,
-        target,
+        raw_attr,
         g={},
         loc={"self": FixtureHostileClass()},
         local_var_types=None,
@@ -524,9 +730,17 @@ def test_non_execution_hostile_property_getter() -> None:
     assert bound == {}
 
 
-def test_non_execution_hostile_descriptor_get() -> None:
-    """Non-execution control 17: Hostile descriptor __get__ is not executed
-    during _bind_call_site_locals classification."""
+def test_hostile_probe_6_custom_descriptor_get() -> None:
+    """Hostile Probe 6: Custom descriptor __get__ raising HostileDescriptorExecuted
+    must not be executed during static inspection."""
+    desc = type.__dict__["__dict__"].__get__(FixtureHostileClass)["hostile_desc"]
+    assert isinstance(desc, HostileDescriptor)
+    assert desc.exec_count == 0
+
+    raw_attr = _safe_raw_class_attribute(FixtureHostileClass, "hostile_desc")
+    assert raw_attr is desc
+    assert desc.exec_count == 0
+
     walker = StaticWalker()
     call_node = ast.Call(
         func=ast.Attribute(
@@ -537,22 +751,90 @@ def test_non_execution_hostile_descriptor_get() -> None:
         args=[],
         keywords=[],
     )
-    target = inspect.getattr_static(FixtureHostileClass, "hostile_desc")
-    # Must not raise HostileDescriptorExecuted
     bound = walker._bind_call_site_locals(
         call_node,
-        target,
+        raw_attr,
         g={},
         loc={"self": FixtureHostileClass()},
         local_var_types=None,
         mechanism="owner-class-attribute",
     )
     assert bound == {}
+    assert desc.exec_count == 0
 
 
-def test_non_execution_hostile_getattr_hook() -> None:
-    """Non-execution control 18: Hostile __getattr__ and __getattribute__ hooks
-    are not executed during static attribute resolution in _bind_call_site_locals."""
+def test_hostile_probe_7_callable_class_attribute() -> None:
+    """Hostile Probe 7: Callable class attribute (instance of callable class)
+    must not be executed and must fail closed (0 arbitrary executions)."""
+    callable_obj = FixtureHostileClass.hostile_callable
+    assert isinstance(callable_obj, HostileCallable)
+    assert callable_obj.exec_count == 0
+
+    raw_attr = _safe_raw_class_attribute(FixtureHostileClass, "hostile_callable")
+    assert raw_attr is callable_obj
+    assert callable_obj.exec_count == 0
+
+    walker = StaticWalker()
+    call_node = ast.Call(
+        func=ast.Attribute(
+            value=ast.Name(id="self", ctx=ast.Load()),
+            attr="hostile_callable",
+            ctx=ast.Load(),
+        ),
+        args=[],
+        keywords=[],
+    )
+    bound = walker._bind_call_site_locals(
+        call_node,
+        raw_attr,
+        g={},
+        loc={"self": FixtureHostileClass()},
+        local_var_types=None,
+        mechanism="owner-class-attribute",
+    )
+    assert bound == {}
+    assert callable_obj.exec_count == 0
+
+
+def test_hostile_probe_8_bool_len_hooks() -> None:
+    """Hostile Probe 8: Hostile classes and objects with __bool__ / __len__ hooks
+    raising exceptions must not be executed during inspection or binding."""
+    raw_attr = _safe_raw_class_attribute(
+        HostileClassWithHostileBoolLen, "target_method"
+    )
+    assert inspect.isfunction(raw_attr)
+
+    walker = StaticWalker()
+    call_node = ast.Call(
+        func=ast.Attribute(
+            value=ast.Name(id="self", ctx=ast.Load()),
+            attr="target_method",
+            ctx=ast.Load(),
+        ),
+        args=[ast.Name(id="helper", ctx=ast.Load())],
+        keywords=[],
+    )
+    helper = FixtureHelper()
+    bound = walker._bind_call_site_locals(
+        call_node,
+        raw_attr,
+        g={},
+        loc={
+            "self": HostileClassWithHostileBoolLen,
+            "helper": helper,
+        },
+        local_var_types=None,
+        mechanism="owner-class-attribute",
+    )
+    assert bound == {
+        "self": HostileClassWithHostileBoolLen,
+        "helper": helper,
+    }
+
+
+def test_hostile_additional_controls_instance_getattr_getattribute() -> None:
+    """Additional Controls: Instance __getattr__ and __getattribute__ hooks must
+    not be executed during static attribute resolution in _bind_call_site_locals."""
     walker = StaticWalker()
     call_node = ast.Call(
         func=ast.Attribute(
@@ -563,10 +845,10 @@ def test_non_execution_hostile_getattr_hook() -> None:
         args=[],
         keywords=[],
     )
+
     def dummy_method(self: object) -> None:
         pass
 
-    # Must not raise HostileGetattrExecuted or HostileGetattributeExecuted
     bound = walker._bind_call_site_locals(
         call_node,
         dummy_method,
@@ -575,6 +857,54 @@ def test_non_execution_hostile_getattr_hook() -> None:
         local_var_types=None,
         mechanism="owner-class-attribute",
     )
-    # Since attribute nonexistent_attribute is not found, no receiver is prepended,
-    # and dummy_method expecting 'self' binds nothing.
     assert bound == {}
+
+
+# ==============================================================================
+# Former Defect Reproductions
+# ==============================================================================
+
+def test_reproduce_former_defect_1_metaclass_getattr_static_vulnerability() -> None:
+    """Defect 1 Reproduction: inspect.getattr_static triggers metaclass __getattribute__,
+    whereas _safe_raw_class_attribute does not execute any arbitrary code."""
+    # Proof of former vulnerability in inspect.getattr_static:
+    with pytest.raises(HostileMetaGetattributeExecuted):
+        inspect.getattr_static(HostileClassWithHostileMetaGetattribute, "target_method")
+
+    # Proof of safe non-executing repair in _safe_raw_class_attribute:
+    attr = _safe_raw_class_attribute(
+        HostileClassWithHostileMetaGetattribute, "target_method"
+    )
+    assert inspect.isfunction(attr)
+
+
+def test_reproduce_former_defect_2_module_dynamic_getattr_vulnerability() -> None:
+    """Defect 2 Reproduction: getattr(mod, name) triggers module __getattr__ (PEP 562),
+    whereas _safe_owner_class_from_qualname does not execute any arbitrary code."""
+    mod_name = "test_defect_2_module_pkg"
+    hmod = types.ModuleType(mod_name)
+    mod_dict = types.ModuleType.__dict__["__dict__"].__get__(hmod)
+
+    def hostile_pep562_getattr(name: str) -> object:
+        raise HostileModuleGetattrExecuted(f"Dynamic module __getattr__ executed for {name}")
+
+    mod_dict["__getattr__"] = hostile_pep562_getattr
+    mod_dict["SafeClass"] = FixturePositiveBase
+    sys.modules[mod_name] = hmod
+    try:
+        # Proof of former vulnerability in getattr(mod, "MissingClass", None):
+        with pytest.raises(HostileModuleGetattrExecuted):
+            getattr(hmod, "MissingClass", None)
+
+        # Proof of safe non-executing repair in _safe_owner_class_from_qualname:
+        resolved_safe = _safe_owner_class_from_qualname(
+            "SafeClass.instance_two_arg.<locals>.<lambda>", mod_name
+        )
+        assert resolved_safe is FixturePositiveBase
+
+        resolved_missing = _safe_owner_class_from_qualname(
+            "MissingClass.method.<locals>.<lambda>", mod_name
+        )
+        assert resolved_missing is None
+    finally:
+        sys.modules.pop(mod_name, None)
