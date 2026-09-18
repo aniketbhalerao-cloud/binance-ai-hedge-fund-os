@@ -560,14 +560,14 @@ Phase 0 projected `calls_unresolved` 901 → **702** (−199) with every other c
    - Task 38.13 functional 114-site movement remains unchanged.
    - Task 38.14 non-execution tests (`test_task_38_14_phase_a_binder.py`) remain completely green.
 
-6. **Residual census and historical 24-root movement snapshot.**
+6. **Residual census and empirical 25-root movement snapshot.**
    - **Specialization Grain (115 total `mappingproxy.items` calls):**
      - **114 resolved** (`exact_identity_policy` with `inspect-signature-parameters-mappingproxy-items` rationale across the 114 specialized provider classes in `ServiceContainer._build`).
      - **1 unresolved** (the unspecialized `ServiceContainer._build` root where `cls` is an unbound parameter and fails closed).
    - **Trace-Record Grain (230 total calls matching `parameters.items`):**
      - **114 resolved** (`exact_identity_policy` direct calls on specialized providers).
      - **116 unresolved** (115 `signature.parameters.items [__get__]` descriptor lookups + 1 direct call on unspecialized root).
-   - **Historical 24-root audit movement snapshot (pre-Task 38.9A scope):**
+   - **Empirical 25-root audit movement snapshot:**
      - `calls_total`: **7,420 → 7,420** (delta 0)
      - `calls_unresolved`: **702 → 588** (delta **-114**)
      - `identity_resolution_buckets.exact_identity_policy`: **2,945 → 3,059** (delta **+114**)
@@ -582,7 +582,7 @@ Phase 0 projected `calls_unresolved` 901 → **702** (−199) with every other c
      - `implicit_dispatch.unresolved_dispatches`: **7,289 → 7,289** (delta 0)
      - `module_state_unexplained`: **0 → 0** (delta 0)
      - `exit_code`: **1 → 1** (delta 0).
-     *(Note: The 24-root snapshot predates the incorporation of `exchange_adapters.manager.DefaultExchangeManager`. See Task 38.13 Governance Phase B.1 below for the canonical 25-root production baseline movement: 7,457 calls, 718 → 604 unresolved, 2,953 → 3,067 exact_identity_policy, 11,445 syntax sites, 7,437 dispatch candidates, 7,313 unresolved dispatches).*
+     *(Note: The 7,420-call / 268-node / 702-unresolved figures represent the canonical empirical 25-root production baseline. See Task 38.13 Governance Phase B.5 below for the authoritative reconciliation establishing the 7,420-call empirical baseline and superseding the erroneous Phase B.1 7,457-call / 269-node projection).*
 
 7. **Two-Phase Provenance durability and mandatory execution sequence.** An authorization is prospective only if it is durable and externally verifiable on `origin/main` before implementation begins. A local, uncommitted edit or unpublished local commit is void under this ADR's never-retroactively rule. The mandatory progression order is strictly enforced:
    1. **Author governance:** Record this Phase 0.2 prospective authorization in ADR-032.
@@ -648,6 +648,75 @@ Phase 0 projected `calls_unresolved` 901 → **702** (−199) with every other c
    - **Evidence reconciliation only:** This update synchronizes canonical audit documentation with the verified 25-root production codebase. It authorizes no new mechanism, broadens no scope, and modifies no harness logic.
    - **Policy table strictly isolated:** `EXACT_IDENTITY_POLICY` remains strictly at **87** entries and version `2026-09-05.1`. Global `builtins.mappingproxy.items` remains firmly **REJECTED**.
    - **Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on the committed figures of record: `nodes_unresolved=16`, `calls_unresolved=702` (historical 24-root baseline) / `588` (historical 24-root post-repair) reconciled to `718` (canonical 25-root baseline) / `604` (canonical 25-root post-repair), `implicit_dispatch.unresolved_dispatches=7289` (historical 24-root) / `7313` (canonical 25-root); `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.13 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
+
+
+**Task 38.13 Governance Phase B.5 — canonical audit evidence correction and empirical 25-root baseline reconciliation, 2026-09-18.** Per this ADR's Two-Phase Provenance (a human-reviewer authorization and formal evidence reconciliation must be durably recorded here before proceeding), this section establishes the true empirical 25-root production baseline and validated post-state for Task 38.13, records the empirical 24-root counterfactual and `DefaultExchangeManager` full-graph contribution, and formally supersedes the evidence conclusions of Phase B.1. **Accepting reviewer:** Aniket Bhalerao — project owner/reviewer. Baseline of record: isolated governance worktree `binance-ai-hedge-fund-os-task3813-evidence-gov` at published canonical commit `0e86c88a0c102908184a069de64e53862c6a26e4`, clean (`git diff` and `git diff --cached` both empty). **Governance preservation and supersession scope:** This phase explicitly **SUPERSEDES** the evidence conclusions and projected numbers of Phase B.1 above. It does **not** erase or retroactively rewrite Phase B.1; Phase B.1 remains preserved above as the published historical record. Phase B.5 is the current authoritative evidence interpretation. **This phase is documentation-and-governance-only:** it changes no implementation code, no test, no evidence artifact, no gate predicate, and no `EXACT_IDENTITY_POLICY` entry.
+
+1. **Empirical 25-root production baseline vs. superseded Phase B.1 projection.**
+   - **Canonical 25-root production configuration:** The production audit harness traces **25 roots** (including `exchange_adapters.manager.DefaultExchangeManager`, wired in Task 38.9A commit `b8ebb23531350d30924e777dfdcbd295311f4f10`).
+   - **True empirical 25-root baseline (pre-Task 38.13):** The complete whole-system 25-root audit population contains **7,420 calls** across **268 nodes**, with **702 unresolved calls** and **16 unresolved nodes**.
+   - **Superseded Phase B.1 projection (`SUPERSEDED ERRONEOUS PROJECTION`):** Phase B.1 (2026-09-17) calculated a 25-root projection of **7,457 calls**, **269 nodes**, and **718 unresolved calls** by adding an isolated single-root walk delta (+37 calls, +1 node, +16 unresolved) to the 7,420-call baseline. Forensic reconciliation in Phase A.5B proved that the 7,420-call population *already* included `DefaultExchangeManager` in full graph context. The Phase B.1 projected values (7,457 calls, 269 nodes, 718 → 604 unresolved, 2,953 → 3,067 exact_identity_policy, 3,781 project_source_available, 11,445 syntax sites, 7,437 dispatch candidates, 7,313 unresolved dispatches) are hereby classified as **SUPERSEDED ERRONEOUS PROJECTION** and voided for current evidence purposes, while remaining preserved as historical record in Section B.1 above.
+
+2. **Empirical 24-root counterfactual and actual `DefaultExchangeManager` full-graph contribution.**
+   - **True 24-root counterfactual (with `exchange_adapters` excluded):**
+     - `roots_traced`: **24**
+     - `nodes_total`: **261**
+     - `calls_total`: **7,144**
+     - `calls_unresolved`: **697**
+     - `identity_resolution_buckets.exact_identity_policy`: **2,836**
+     - `identity_resolution_buckets.project_source_available`: **3,606**
+     - `identity_resolution_buckets.forbidden`: **5**
+     - `implicit_dispatch.syntax_sites_total`: **10,957**
+     - `implicit_dispatch.dispatch_candidates_total`: **7,109**
+     - `implicit_dispatch.resolved_dispatches`: **119**
+     - `implicit_dispatch.unresolved_dispatches`: **6,990**
+   - **Actual `DefaultExchangeManager` full-graph contribution (24-root → 25-root delta):**
+     - `roots_traced`: **+1** (24 → 25)
+     - `nodes_total`: **+7** (261 → 268)
+     - `calls_total`: **+276** (7,144 → 7,420)
+     - `calls_unresolved`: **+5** (697 → 702)
+     - `identity_resolution_buckets.exact_identity_policy`: **+109** (2,836 → 2,945)
+     - `identity_resolution_buckets.project_source_available`: **+162** (3,606 → 3,768)
+     - `identity_resolution_buckets.forbidden`: **+0** (5 → 5)
+     - `implicit_dispatch.syntax_sites_total`: **+448** (10,957 → 11,405)
+     - `implicit_dispatch.dispatch_candidates_total`: **+304** (7,109 → 7,413)
+     - `implicit_dispatch.resolved_dispatches`: **+5** (119 → 124)
+     - `implicit_dispatch.unresolved_dispatches`: **+299** (6,990 → 7,289)
+
+3. **Canonical Task 38.13 empirical movement on 25-root baseline.**
+   Under the authorized receiver-constrained `inspect-signature-parameters-mappingproxy-items` proof mechanism (Phase A), exactly **114** specialized `mappingproxy.items` calls resolve to `exact_identity_policy`:
+   - `calls_total`: **7,420 → 7,420** (delta **0**)
+   - `calls_unresolved`: **702 → 588** (delta **-114**)
+   - `identity_resolution_buckets.exact_identity_policy`: **2,945 → 3,059** (delta **+114**)
+   - `identity_resolution_buckets.project_source_available`: **3,768 → 3,768** (delta **0**)
+   - `identity_resolution_buckets.forbidden`: **5 → 5** (delta **0**)
+   - `identity_resolution_buckets.unresolved`: **702 → 588** (delta **-114**)
+   - `nodes_total`: **268 → 268** (delta **0**)
+   - `nodes_unresolved`: **16 → 16** (delta **0**)
+   - `implicit_dispatch.syntax_sites_total`: **11,405 → 11,405** (delta **0**)
+   - `implicit_dispatch.dispatch_candidates_total`: **7,413 → 7,413** (delta **0**)
+   - `implicit_dispatch.resolved_dispatches`: **124 → 124** (delta **0**)
+   - `implicit_dispatch.unresolved_dispatches`: **7,289 → 7,289** (delta **0**)
+   - `module_state_unexplained`: **0 → 0** (delta **0**)
+   - `exit_code`: **1 → 1** (delta **0**).
+   *(Invariant movement: exactly -114 unresolved calls, exactly +114 exact_identity_policy calls, every other counter delta 0).*
+
+4. **Dual-grain residual accounting preserved.**
+   - **Specialization Grain (115 total `mappingproxy.items` calls):**
+     - **114 resolved** (`exact_identity_policy` with `inspect-signature-parameters-mappingproxy-items` rationale across the 114 specialized provider classes in `ServiceContainer._build`).
+     - **1 unresolved** (the unspecialized `ServiceContainer._build` root where `cls` is an unbound parameter and fails closed).
+   - **Trace-Record Grain (230 total records matching `parameters.items`):**
+     - **114 resolved** (`exact_identity_policy` direct calls on specialized providers).
+     - **116 unresolved** (115 `signature.parameters.items [__get__]` descriptor lookups + 1 direct call on unspecialized root).
+
+5. **Governance interpretation, gate state distinction, and invariant reaffirmation.**
+   - **Evidence reconciliation only:** This update synchronizes canonical audit documentation with the verified empirical 25-root production codebase. It authorizes no new mechanism, broadens no scope, and modifies no harness logic.
+   - **Policy table strictly isolated:** `EXACT_IDENTITY_POLICY` remains strictly at **87** entries and version `2026-09-05.1`. Global `builtins.mappingproxy.items` remains firmly **REJECTED**.
+   - **Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on both the current published baseline and the validated uncommitted post-state:
+     - **Current published/committed baseline:** `nodes_unresolved=16`, `calls_unresolved=702`, `implicit_dispatch.unresolved_dispatches=7289`, `exit_code=1`.
+     - **Validated Task 38.13 post-state (not yet committed):** `nodes_unresolved=16`, `calls_unresolved=588`, `implicit_dispatch.unresolved_dispatches=7289`, `exit_code=1`.
+     - **Operative gate status:** `ADR-032 remains HOLD on the current published baseline (calls_unresolved=702) and would remain HOLD under the validated Task 38.13 post-state (calls_unresolved=588).`
+     - All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.13 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
 
 
 ## Alternatives Considered
