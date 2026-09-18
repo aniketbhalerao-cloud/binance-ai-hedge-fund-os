@@ -799,6 +799,7 @@ def classify_callable(
     qualname: str | None,
     is_dataclass_generated: bool = False,
     is_namedtuple_generated: bool = False,
+    is_inspect_signature_parameters_mappingproxy_items: bool = False,
 ) -> IdentityVerdict:
     """Classify one resolved live callable per Harness Requirement 4.
 
@@ -811,6 +812,11 @@ def classify_callable(
     ``__new__``: the caller must have already confirmed it via
     :func:`is_namedtuple_generated_new`, structurally, before setting
     this flag -- this function does not re-derive that fact either.
+    ``is_inspect_signature_parameters_mappingproxy_items`` is the
+    Task 38.13 receiver-constrained discipline for ``parameters.items()``
+    calls on proven ``inspect.Signature`` instances: the caller must
+    have structurally verified Obligations A–G before setting this flag --
+    this function does not re-derive that fact either.
     """
     key = _identity_key(module, qualname)
 
@@ -881,6 +887,15 @@ def classify_callable(
                 "to do nothing but assemble those exact fields into a "
                 "tuple, no arbitrary code possible."
             ),
+            False,
+        )
+
+    if is_inspect_signature_parameters_mappingproxy_items:
+        return IdentityVerdict(
+            module or "builtins",
+            qualname or "mappingproxy.items",
+            "exact_identity_policy",
+            "inspect-signature-parameters-mappingproxy-items",
             False,
         )
 

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import ast
 import builtins
+import collections
 import dataclasses
 import functools
 import inspect
@@ -202,6 +203,54 @@ _CHAINED_RECEIVER_RATIONALE = (
 #: which this module's new resolution paths never call on a
 #: caller-influenced (audited) object.
 _MISSING = object()
+
+_type_mro_get = type.__dict__["__mro__"].__get__
+_type_dict_get = type.__dict__["__dict__"].__get__
+_type_module_get = type.__dict__["__module__"].__get__
+_type_qualname_get = type.__dict__["__qualname__"].__get__
+_module_dict_get = types.ModuleType.__dict__["__dict__"].__get__
+
+
+def _is_safe_metaclass(meta: type) -> bool:
+    if not isinstance(meta, type):
+        return False
+    if meta is type:
+        return True
+    try:
+        mro = _type_mro_get(meta)
+    except Exception:
+        return False
+    for base in mro:
+        try:
+            d = _type_dict_get(base)
+        except Exception:
+            return False
+        if "__signature__" in d:
+            return False
+        if "__getattr__" in d:
+            return False
+        if "__getattribute__" in d and d["__getattribute__"] is not type.__getattribute__:
+            return False
+        if "__call__" in d and d["__call__"] is not type.__call__:
+            return False
+    return True
+
+
+def _is_safe_subject(cls: type) -> bool:
+    if not isinstance(cls, type):
+        return False
+    try:
+        mro = _type_mro_get(cls)
+    except Exception:
+        return False
+    for base in mro:
+        try:
+            d = _type_dict_get(base)
+        except Exception:
+            return False
+        if "__signature__" in d:
+            return False
+    return _is_safe_metaclass(type(cls))
 
 
 def _static_get(obj: object, name: str) -> object:
@@ -1317,8 +1366,8 @@ class StaticWalker:
             target_mod = getattr(target, "__module__", None)
             owner_cls = _safe_owner_class_from_qualname(target_qn, target_mod)
             if owner_cls is None:
-                rec_val = loc.get(node.func.value.id)
-                if rec_val is not None:
+                rec_val = loc.get(node.func.value.id, _MISSING)
+                if rec_val is not _MISSING:
                     owner_cls = rec_val if isinstance(rec_val, type) else type(rec_val)
             if owner_cls is not None and isinstance(owner_cls, type):
                 raw_attr = _safe_raw_class_attribute(owner_cls, node.func.attr)
@@ -1349,8 +1398,178 @@ class StaticWalker:
                     out[name] = local_var_types[value_node.id]
         return out
 
+    def _prove_inspect_signature_parameters_mappingproxy_items(
+        self,
+        node: ast.Call,
+        tree: ast.AST,
+        target: object = types.MappingProxyType.items,
+        g: dict[str, object] | None = None,
+        loc: dict[str, object] | None = None,
+        local_var_types: dict[str, type] | None = None,
+    ) -> bool:
+        """Task 38.13: Prove Obligations A–G for a candidate
+        `signature.parameters.items()` call site.
+
+        Obligations:
+        A. Receiver provenance from inspect.signature(...) with write-once guarantee
+        B. Exact type(sig) is inspect.Signature
+        C. No subject or metaclass __signature__ escape hatch / hostile metaclass
+        D. Parameters mapping backed only by authorized dict/OrderedDict view behavior
+        E. Exact types.MappingProxyType.items descriptor identity
+        F. Zero-argument direct attribute call shape
+        G. Fail closed otherwise
+        """
+        if isinstance(target, dict) and local_var_types is None:
+            local_var_types = loc if loc is not None else {}
+            loc = g if g is not None else {}
+            g = target
+            target = types.MappingProxyType.items
+
+        g = g or {}
+        loc = loc or {}
+        local_var_types = local_var_types or {}
+
+        # Obligation E: exact live types.MappingProxyType.items descriptor identity
+        if target is not types.MappingProxyType.items:
+            return False
+
+        # Obligation F: zero-argument direct attribute call shape
+        if node.args or node.keywords:
+            return False
+        if not isinstance(node.func, ast.Attribute) or node.func.attr != "items":
+            return False
+        receiver_attr = node.func.value
+        if (
+            not isinstance(receiver_attr, ast.Attribute)
+            or receiver_attr.attr != "parameters"
+        ):
+            return False
+        sig_expr = receiver_attr.value
+        if not isinstance(sig_expr, ast.Name):
+            return False
+
+        sig_name = sig_expr.id
+
+        # Obligation B: type of sig local is inspect.Signature
+        if local_var_types.get(sig_name) is not inspect.Signature:
+            return False
+
+        # Obligation A: Write-once provenance in complete function scope
+        writes = 0
+        single_assign: ast.Assign | None = None
+        for stmt in _shallow_descendants(tree):
+            if isinstance(stmt, ast.Assign):
+                for t in stmt.targets:
+                    if isinstance(t, ast.Name) and t.id == sig_name:
+                        writes += 1
+                        if len(stmt.targets) == 1:
+                            single_assign = stmt
+                    elif isinstance(t, (ast.Tuple, ast.List)):
+                        for elt in ast.walk(t):
+                            if isinstance(elt, ast.Name) and elt.id == sig_name:
+                                writes += 1
+            elif isinstance(stmt, ast.AnnAssign):
+                if isinstance(stmt.target, ast.Name) and stmt.target.id == sig_name:
+                    writes += 1
+                elif isinstance(stmt.target, (ast.Tuple, ast.List)):
+                    for elt in ast.walk(stmt.target):
+                        if isinstance(elt, ast.Name) and elt.id == sig_name:
+                            writes += 1
+            elif isinstance(stmt, ast.AugAssign):
+                if isinstance(stmt.target, ast.Name) and stmt.target.id == sig_name:
+                    writes += 1
+                elif isinstance(stmt.target, (ast.Tuple, ast.List)):
+                    for elt in ast.walk(stmt.target):
+                        if isinstance(elt, ast.Name) and elt.id == sig_name:
+                            writes += 1
+            elif isinstance(stmt, ast.NamedExpr):
+                if isinstance(stmt.target, ast.Name) and stmt.target.id == sig_name:
+                    writes += 1
+            elif isinstance(stmt, ast.Delete):
+                for t in stmt.targets:
+                    if isinstance(t, ast.Name) and t.id == sig_name:
+                        writes += 1
+                    elif isinstance(t, (ast.Tuple, ast.List)):
+                        for elt in ast.walk(t):
+                            if isinstance(elt, ast.Name) and elt.id == sig_name:
+                                writes += 1
+
+        if writes != 1 or single_assign is None:
+            return False
+
+        assign_call = single_assign.value
+        if not isinstance(assign_call, ast.Call):
+            return False
+
+        if len(assign_call.args) != 1 or assign_call.keywords:
+            return False
+
+        # Callee must be exact live inspect.signature
+        callee = None
+        if (
+            isinstance(assign_call.func, ast.Attribute)
+            and isinstance(assign_call.func.value, ast.Name)
+        ):
+            mod_obj = loc.get(assign_call.func.value.id, _MISSING)
+            if mod_obj is _MISSING:
+                mod_obj = g.get(assign_call.func.value.id, _MISSING)
+            if mod_obj is inspect and assign_call.func.attr == "signature":
+                callee = inspect.signature
+        elif isinstance(assign_call.func, ast.Name):
+            fn_obj = loc.get(assign_call.func.id, _MISSING)
+            if fn_obj is _MISSING:
+                fn_obj = g.get(assign_call.func.id, _MISSING)
+            if fn_obj is inspect.signature:
+                callee = inspect.signature
+
+        if callee is not inspect.signature:
+            return False
+
+        subject_arg = assign_call.args[0]
+        if not isinstance(subject_arg, ast.Name):
+            return False
+
+        subject = loc.get(subject_arg.id, _MISSING)
+        if subject is _MISSING:
+            subject = g.get(subject_arg.id, _MISSING)
+        if not isinstance(subject, type):
+            return False
+
+        # Obligation C: Non-execution safety gates on subject and metaclass
+        if not _is_safe_subject(subject):
+            return False
+
+        try:
+            sig = inspect.signature(subject)
+        except Exception:
+            return False
+
+        # Obligation B: exact Signature runtime type
+        if type(sig) is not inspect.Signature:
+            return False
+
+        # Obligation D: parameters mapping backed by MappingProxyType with authorized view
+        params = sig.parameters
+        if type(params) is not types.MappingProxyType:
+            return False
+
+        items_view = params.items()
+        if type(items_view) not in (
+            type({}.items()),
+            type(collections.OrderedDict().items()),
+        ):
+            return False
+
+        return True
+
     def _record_call(
-        self, site_label: str, node: ast.Call, target: object, mechanism: str
+        self,
+        site_label: str,
+        node: ast.Call,
+        target: object,
+        mechanism: str,
+        *,
+        is_inspect_signature_parameters_mappingproxy_items: bool = False,
     ) -> IdentityVerdict | None:
         callee_text = ast.unparse(node.func)
         if mechanism == "local-helper-inline":
@@ -1378,7 +1597,12 @@ class StaticWalker:
         if inspect.isclass(target):
             qn = f"{module}.{qualname}"
             self.unified_nodes[qn] = target
-        verdict = classify_callable(target, module=module, qualname=qualname)
+        verdict = classify_callable(
+            target,
+            module=module,
+            qualname=qualname,
+            is_inspect_signature_parameters_mappingproxy_items=is_inspect_signature_parameters_mappingproxy_items,
+        )
         self.call_records.append(
             CallRecord(site_label, callee_text, mechanism, verdict)
         )
@@ -1498,6 +1722,15 @@ class StaticWalker:
         specialization."""
 
         def ident(value: object) -> str:
+            if isinstance(value, type):
+                try:
+                    mod = _type_module_get(value)
+                    qn = _type_qualname_get(value)
+                    if mod and qn:
+                        return f"{mod}.{qn}"
+                except Exception:
+                    pass
+                return repr(type(value))
             mod = getattr(value, "__module__", None)
             qn = getattr(value, "__qualname__", None)
             return f"{mod}.{qn}" if mod and qn else repr(type(value))
@@ -2483,7 +2716,25 @@ class StaticWalker:
                 first_param_name,
                 local_callable_aliases,
             )
-            call_verdict = self._record_call(site_label, node, target, mechanism)
+            is_insp_sig_mappingproxy = False
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "items"
+                and isinstance(node.func.value, ast.Attribute)
+                and node.func.value.attr == "parameters"
+            ):
+                is_insp_sig_mappingproxy = (
+                    self._prove_inspect_signature_parameters_mappingproxy_items(
+                        node, tree, target, g, loc, local_var_types
+                    )
+                )
+            call_verdict = self._record_call(
+                site_label,
+                node,
+                target,
+                mechanism,
+                is_inspect_signature_parameters_mappingproxy_items=is_insp_sig_mappingproxy,
+            )
 
             if inspect.isfunction(target) or inspect.ismethod(target):
                 target_module = getattr(target, "__module__", None)
