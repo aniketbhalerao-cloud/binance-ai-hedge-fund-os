@@ -719,6 +719,138 @@ Phase 0 projected `calls_unresolved` 901 → **702** (−199) with every other c
      - All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.13 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
 
 
+**Task 38.15 Governance Phase 1 — prospective authorization of receiver-constrained `pydantic-settings-model-config-get` resolution mechanism, 2026-09-21.** Per this ADR's Two-Phase Provenance (a human-reviewer authorization and formal mechanism specification must be durably recorded and published here before any implementation, staging, or testing begins), this section prospectively authorizes exactly one new receiver-constrained callable resolution mechanism: `pydantic-settings-model-config-get`. **Accepting reviewer:** Aniket Bhalerao — project owner/reviewer. Baseline of record: published canonical baseline `abfd0b6c2e8427a44218c320050a3a38368db9b5`, clean (`git diff` and `git diff --cached` both empty). **This phase is documentation-and-governance-only:** it changes no implementation code, no test, no evidence artifact, no gate predicate, and no `EXACT_IDENTITY_POLICY` entry.
+
+1. **Characterization of target unresolved population.**
+   - **Target population scope ($N = 47$):** Exactly 47 unresolved calls in the canonical whole-system 25-root audit trace corresponding to bounded configuration dictionary lookups across `pydantic_settings`:
+     - `cls.model_config.get(...)` (28 calls in `pydantic_settings/main.py:322-392` within `BaseSettings._settings_init_sources`)
+     - `settings_cls.model_config.get(...)` (5 calls total: 3 calls in `pydantic_settings/sources/providers/dotenv.py:53,55,58` within `DotEnvSettingsSource.__init__`; 2 calls in `pydantic_settings/main.py:558,560` within `BaseSettings._settings_restore_init_kwarg_names`)
+     - `self.config.get(...)` (14 calls total across `PydanticBaseSettingsSource` subclasses: 1 call in `pydantic_settings/sources/base.py:283` in `DefaultSettingsSource.__init__`; 4 calls in `pydantic_settings/sources/base.py:323,324,324,377` in `InitSettingsSource.__init__`; 6 calls in `pydantic_settings/sources/base.py:408,409,411,414,417,419` in `PydanticBaseEnvSettingsSource.__init__`; 2 calls in `pydantic_settings/sources/providers/env.py:76,79` in `EnvSettingsSource.__init__`; 1 call in `pydantic_settings/sources/providers/secrets.py:54` in `SecretsSettingsSource.__init__`)
+   - **Reconciliation of 45-call Phase 0 census vs. 47-call census:** The initial Phase 0 exploratory scan identified 45 candidate sites by querying `_settings_init_sources` (28 calls), `DotEnvSettingsSource.__init__` (3 calls), and `self.config.get` across sources (14 calls), accidentally omitting the 2 calls in `BaseSettings._settings_restore_init_kwarg_names` (lines 558, 560). Forensic re-audit confirms that all 47 calls are strictly homogeneous in receiver provenance, callable identity, argument shape, and non-execution constraints, establishing the true authorized population at $N = 47$.
+   - **Target callable:** Standard library `builtins.dict.get` (`dict.get`).
+   - **Architectural necessity for receiver-constrained proof:** `dict.get` is a ubiquitous dictionary method across Python applications. Adding `builtins.dict.get` or `dict.get` globally to `EXACT_IDENTITY_POLICY` would unconditionally resolve every arbitrary dictionary lookup across all analyzed modules, destroying Layer-1 fail-closed verification boundaries. Resolution of `dict.get` must therefore be strictly receiver-constrained: proven statically to operate only on the verified `dict` (`ConfigDict`) configuration dictionary of a validated `BaseSettings` or `PydanticBaseSettingsSource` class.
+
+2. **Authorized mechanism definition and identity contract.**
+   - **Mechanism identifier:** `pydantic-settings-model-config-get`
+   - **Classification category:** `exact_identity_policy`
+   - **Classification rationale:** `pydantic-settings-model-config-get`
+   - **Identity layer contract:** Handled via specialized non-executing receiver proof in `audit_harness/trace.py` and signaled via dedicated parameter `is_pydantic_settings_model_config_get=True` to `audit_harness.identity.classify_callable`. Global `EXACT_IDENTITY_POLICY` table remains strictly unchanged at **87** entries and version `2026-09-05.1`.
+
+3. **Formal Proof Obligations (A through G).**
+   Static verification of any `dict.get` call under this mechanism requires satisfying all seven proof obligations simultaneously:
+   - **Obligation A (Call-site AST Syntactic Form and Write-Once Provenance):**
+     - The call node must match `ast.Call(func=ast.Attribute(value=..., attr='get'), args=..., keywords=[])`.
+     - The receiver expression (`func.value`) must conform to one of the verified AST attribute nesting shapes:
+       1. `ast.Attribute(value=ast.Name(id='cls'), attr='model_config')`
+       2. `ast.Attribute(value=ast.Name(id='settings_cls'), attr='model_config')`
+       3. `ast.Attribute(value=ast.Name(id='self'), attr='config')`
+     - The receiver variable must satisfy write-once semantics or known structural initialization without intermediate reassignment, aliasing, walrus overwrites (`:=`), or deletion (`del`).
+   - **Obligation B (Receiver Provenance and Container Type Invariance):**
+     - For `cls.model_config` / `settings_cls.model_config`: the target class symbol must statically resolve to `BaseSettings` or a verified subclass thereof, whose `model_config` attribute is the standard `ConfigDict`.
+     - For `self.config`: `self` must be proven to be an instance of `PydanticBaseSettingsSource` (or a verified subclass), whose `config` attribute is initialized via `self.config = settings_cls.model_config` during instance construction.
+   - **Obligation C (Settings Subject Non-Execution and Metaclass Safety):**
+     - The target settings class must be a safe subject verified via `_is_safe_subject` and `_is_safe_metaclass`.
+     - Static inspection must never execute arbitrary user-defined dunder methods (`__getattribute__`, `__getattr__`, `__call__`, `__bool__`, `__len__`) or custom metaclass hooks.
+     - Introspection of class attributes and MRO must proceed strictly through safe non-executing primitives (`_type_mro_get`, `_type_dict_get`, `_safe_raw_class_attribute`).
+   - **Obligation D (Config Container Type Invariance):**
+     - The runtime container object must satisfy `type(config_obj) is dict` strictly. In Pydantic V2, `ConfigDict` is a TypedDict whose runtime instances are standard Python dictionaries.
+     - Arbitrary `Mapping` implementations, custom dictionary subclasses overriding `.get()`, proxy objects, or hostile descriptors must be rejected.
+   - **Obligation E (Callable Identity Invariance):**
+     - The resolved method descriptor must satisfy `target is dict.get` (or `getattr(dict, 'get')` / `type(config_obj).get is dict.get`).
+     - Any method override or descriptor interceptor on `.get` must fail closed.
+   - **Obligation F (Argument Shape Conformance):**
+     - The call must conform strictly to standard positional `dict.get` signatures:
+       - 1 argument: `get(key)` (36 observed sites)
+       - 2 arguments: `get(key, default)` (11 observed sites)
+     - Keyword arguments (`kwargs`) are strictly forbidden (`len(node.keywords) == 0`).
+     - Calls with >2 positional arguments are strictly forbidden (`len(node.args) <= 2`).
+   - **Obligation G (Fail-Closed Default):**
+     - If any obligation (A through F) cannot be affirmatively proven using static AST and symbol analysis without code execution, the call must remain `unresolved`.
+
+4. **Non-execution safety mandates.**
+   - Static AST walking and receiver proof dispatch must never trigger code execution on hostile subjects.
+   - Specifically, hostile metaclasses with `__getattribute__`, `__getattr__`, or `__call__` must not execute when evaluating `cls.model_config` or `settings_cls.model_config`.
+   - Hostile descriptors placed on `model_config` or `config` (e.g. `__get__` raising `HostileExecutionError`) must never be triggered during static analysis.
+   - Hostile objects implementing raising `__bool__` or `__len__` dunder methods must not be evaluated during truthiness or length checks in the walker or proof dispatcher.
+
+5. **Required negative controls and test obligations (Phase A implementation contract).**
+   Phase A implementation must provide a dedicated regression suite (`tests/audit_harness/test_task_38_15_phase_a_mechanism.py`) verifying all 22 negative control scenarios:
+   1. Unrelated ordinary `dict.get` outside authorized receiver provenance fails closed to `unresolved`.
+   2. Arbitrary `dict` subclass overriding `get` fails closed to `unresolved`.
+   3. `Mapping` subclass / non-dict mapping implementation fails closed to `unresolved`.
+   4. Custom object exposing `.get` method fails closed to `unresolved`.
+   5. Dynamically obtained receiver (e.g., `getattr(cls, 'model_config').get(...)`) fails closed to `unresolved`.
+   6. Dynamically obtained `get` (e.g., `getattr(cls.model_config, 'get')(...)`) fails closed to `unresolved`.
+   7. Alias to unrelated `dict.get` fails closed to `unresolved`.
+   8. Reassigned `model_config` (violating write-once / structural initialization) fails closed to `unresolved`.
+   9. Reassigned `self.config` fails closed to `unresolved`.
+   10. Non-Pydantic / wrong settings class accessing `model_config.get(...)` fails closed to `unresolved`.
+   11. Hostile descriptor on `model_config` or `config` produces **0 arbitrary executions** and fails closed.
+   12. Hostile instance `__getattribute__` produces **0 arbitrary executions** and fails closed.
+   13. Hostile instance `__getattr__` produces **0 arbitrary executions** and fails closed.
+   14. Hostile metaclass `__getattribute__` produces **0 arbitrary executions** and fails closed.
+   15. Hostile metaclass `__getattr__` produces **0 arbitrary executions** and fails closed.
+   16. Hostile metaclass `__call__` produces **0 arbitrary executions** and fails closed.
+   17. Hostile `__bool__` on receiver or arguments produces **0 arbitrary executions** and fails closed.
+   18. Hostile `__len__` on receiver or arguments produces **0 arbitrary executions** and fails closed.
+   19. Textual lookalike variable or attribute named `model_config` or `config` without verified type provenance fails closed.
+   20. Wrong traced target callable identity fails closed to `unresolved`.
+   21. Call with keyword arguments (`.get(key="foo")` or `.get(k, default="bar")`) fails closed to `unresolved`.
+   22. Call with >2 positional arguments (`.get(a, b, c)`) fails closed to `unresolved`.
+   - All existing test suites (`test_task_38_13_phase_a_mechanism.py`, `test_task_38_14_phase_a_binder.py`, etc.) remain completely green.
+
+6. **Prospective movement metrics on canonical 25-root baseline.**
+   - **Canonical baseline state of record (commit `abfd0b6c2e8427a44218c320050a3a38368db9b5`):**
+     - `roots_traced`: **25**
+     - `nodes_total`: **268**
+     - `nodes_unresolved`: **16**
+     - `calls_total`: **7,420**
+     - `calls_unresolved`: **588**
+     - `identity_resolution_buckets.exact_identity_policy`: **3,059**
+     - `identity_resolution_buckets.project_source_available`: **3,768**
+     - `identity_resolution_buckets.forbidden`: **5**
+     - `identity_resolution_buckets.unresolved`: **588**
+     - `implicit_dispatch.syntax_sites_total`: **11,405**
+     - `implicit_dispatch.dispatch_candidates_total`: **7,413**
+     - `implicit_dispatch.resolved_dispatches`: **124**
+     - `implicit_dispatch.unresolved_dispatches`: **7,289**
+     - `module_state_unexplained`: **0**
+     - `exit_code`: **1**
+   - **Projected Phase A movement under `pydantic-settings-model-config-get` ($N = 47$):**
+     - Resolves the 47 bounded configuration lookup calls across `pydantic_settings`.
+     - `calls_total`: **7,420 → 7,420** (delta **0**)
+     - `calls_unresolved`: **588 → 541** (delta **-47**)
+     - `identity_resolution_buckets.exact_identity_policy`: **3,059 → 3,106** (delta **+47**)
+     - `identity_resolution_buckets.project_source_available`: **3,768 → 3,768** (delta **0**)
+     - `identity_resolution_buckets.forbidden`: **5 → 5** (delta **0**)
+     - `identity_resolution_buckets.unresolved`: **588 → 541** (delta **-47**)
+     - `nodes_total`: **268 → 268** (delta **0**)
+     - `nodes_unresolved`: **16 → 16** (delta **0**)
+     - `implicit_dispatch.syntax_sites_total`: **11,405 → 11,405** (delta **0**)
+     - `implicit_dispatch.dispatch_candidates_total`: **7,413 → 7,413** (delta **0**)
+     - `implicit_dispatch.resolved_dispatches`: **124 → 124** (delta **0**)
+     - `implicit_dispatch.unresolved_dispatches`: **7,289 → 7,289** (delta **0**)
+     - `module_state_unexplained`: **0 → 0** (delta **0**)
+     - `exit_code`: **1 → 1** (delta **0**).
+
+7. **Two-Phase Provenance durability and mandatory execution sequence.**
+   An authorization is prospective only if it is durable and externally verifiable on `origin/main` before implementation begins. The mandatory progression order is strictly enforced:
+   1. **Author governance:** Record this Phase 1 prospective authorization in `ADR-032` (this step).
+   2. **Stage governance separately:** Stage only `ADR-032` in the governance worktree (`git add docs/architecture/decisions/ADR-032-structural-audit-gate.md`).
+   3. **Commit governance:** Create a governance-only commit containing only the ADR changes.
+   4. **Push and verify canonical publication:** Push the governance commit to `origin/main` and verify durable publication.
+   5. **Create fresh post-authorization Task 38.15 implementation worktree:** Branch a fresh worktree directly from the published governance commit on `origin/main`.
+   6. **Implement the authorized Phase A changes:** Implement the non-executing proof mechanism and classifier flag in `audit_harness/trace.py` and `audit_harness/identity.py`.
+   7. **Test and evidence review:** Execute the complete test suite including negative controls and record audit metrics independently against the published baseline.
+   8. **Stage implementation:** Only after all previous steps are satisfied may Phase A implementation changes be staged for review.
+
+8. **Governance interpretation and invariant reaffirmation.**
+   - **Policy table strictly isolated:** `EXACT_IDENTITY_POLICY` remains strictly at **87** entries and version `2026-09-05.1`. Global `builtins.dict.get` or `dict.get` remains firmly **REJECTED**.
+   - **Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on both the current published baseline (`calls_unresolved=588`) and the projected post-state (`calls_unresolved=541`): `nodes_unresolved=16`, `implicit_dispatch.unresolved_dispatches=7289`, `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.15 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
+
+**Non-goals — explicitly outside this authorization.** No `EXACT_IDENTITY_POLICY` modification and **specifically no `builtins.dict.get` or `dict.get` key**; no policy version bump (`2026-09-05.1`, 87 entries unchanged); no production or trading code changes; no M-8 or M-9 remediation; no Task 39 work; and **no attempt to clear the gate**.
+
+
 ## Alternatives Considered
 - **No formal gate — treat the audit as informational only.** Rejected: an audit whose findings carry no consequence is easy to produce and easy to ignore; the entire point of running a structural audit before Task 39 is to make its outcome actionable.
 - **Gate on any open finding, regardless of severity.** Rejected: with 9 Low findings already on record (mostly `baseline: unknown` typing gaps and test-coverage notes), gating on every open item would block indefinitely on cosmetic issues unrelated to safety. The severity rubric exists precisely so the gate tracks what actually matters — a real reachable I/O/trading/inference/credential-leak path.
