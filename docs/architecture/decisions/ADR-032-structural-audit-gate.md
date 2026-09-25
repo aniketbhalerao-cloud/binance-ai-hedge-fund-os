@@ -851,6 +851,125 @@ Phase 0 projected `calls_unresolved` 901 → **702** (−199) with every other c
 **Non-goals — explicitly outside this authorization.** No `EXACT_IDENTITY_POLICY` modification and **specifically no `builtins.dict.get` or `dict.get` key**; no policy version bump (`2026-09-05.1`, 87 entries unchanged); no production or trading code changes; no M-8 or M-9 remediation; no Task 39 work; and **no attempt to clear the gate**.
 
 
+**Task 38.15 Governance Phase 1.4 — canonical evidence reconciliation and authorized population correction (N=47 -> N=45, 7413/7289 baseline reconciliation), 2026-09-25.** Per this ADR's Two-Phase Provenance (requiring mathematical and forensic reconciliation of all audit figures on canonical published baselines prior to implementation staging), this section prospectively amends and supersedes the initial Phase 1 population projection ($N = 47$) and resolves the empirical dispatch counter movement observed during forensic evaluation. **Accepting reviewer:** Aniket Bhalerao — project owner/reviewer. Baseline of record: published canonical baseline commit `db8fb1dd34f02e1ac0edd50ed6d7cc65ad53ae24`, clean. **This phase is documentation-and-governance-only:** it changes no implementation code, no test, no evidence artifact, no gate predicate, and no `EXACT_IDENTITY_POLICY` entry.
+
+1. **Population Reconciliation ($N = 47 \to N_{\text{effective}} = 45$).**
+   - **Initial Phase 1 static projection ($N = 47$):** Phase 1 identified 47 syntactic/static call sites across the source code of `pydantic_settings` (28 `cls.model_config.get`, 5 `settings_cls.model_config.get`, 14 `self.config.get` across sources).
+   - **Empirical 25-root reachable trace census (46 trace records):** Whole-system static AST analysis across all 25 operational composition roots discovers exactly 46 reachable `dict.get` call records in `pydantic_settings`:
+     - `cls.model_config.get(...)`: Exactly 27 reachable call records in `pydantic_settings/main.py:322-392` (all 27 unresolved on baseline).
+     - `settings_cls.model_config.get(...)`: Exactly 7 reachable call records across:
+       - `pydantic_settings/main.py`: 2 calls (`main.py:440-441`)
+       - `pydantic_settings/sources/base.py`: 2 calls (`base.py:100-101`)
+       - `pydantic_settings/sources/providers/dotenv.py`: 3 calls (`dotenv.py:68-70`)
+       (all 7 unresolved on baseline due to provider specialization across 25 roots).
+     - `self.config.get(...)` & `model_config.get(...)`: Exactly 12 reachable call records across `pydantic_settings/sources/`:
+       - **1 pre-resolved call record:** `pydantic_settings/main.py:548` (`BaseSettings._settings_warn_unused_config_keys`, nested function `warn_if_not_used`, `model_config.get(key)`) has an explicit parameter type annotation `model_config: SettingsConfigDict` and was pre-resolved on baseline to `builtins.dict.get` via the pre-existing `parameter-annotation-substitution` / exact built-in `dict.get` resolution mechanism prior to Task 38.15 (`category='exact_identity_policy'`, rationale `CPython stdlib builtin: pure dict read, no I/O by definition.`, record index [116] in baseline trace).
+       - *Explicit note on DefaultSettingsSource:* `DefaultSettingsSource.__init__` at `pydantic_settings/sources/base.py:247` calls `self.config.get('nested_model_default_partial_update', False)`. This call record is index [316] in the baseline trace and is UNRESOLVED on baseline, forming 1 of the 11 unresolved `self.config.get` records. It is NOT pre-resolved.
+       - **11 unresolved call records:** `self.config.get(...)` across `DefaultSettingsSource` (1 call at `base.py:247`), `InitSettingsSource` (1 call at `base.py:109`), `EnvSettingsSource` (2 calls at `base.py:165-170`), `PydanticBaseEnvSettingsSource` (6 calls at `base.py:119-146`), and `SecretsSettingsSource` (1 call at `providers/secrets.py:33`).
+   - **Population Arithmetic:**
+     - Reachable related trace records: **46**
+     - Pre-resolved records: **1**
+     - Eligible unresolved population: $46 - 1 = \mathbf{45}$ ($N_{\text{effective}} = 45$)
+     - Receiver split: $27 (\text{cls.model\_config.get}) + 7 (\text{settings\_cls.model\_config.get}) + 11 (\text{self.config.get}) = \mathbf{45}$
+
+2. **Dispatch Counter Reconciliation (7,413/7,289 vs 7,407/7,283).**
+   - **Canonical published baseline counters (`db8fb1dd34f02e1ac0edd50ed6d7cc65ad53ae24`):**
+     - `implicit_dispatch.syntax_sites_total`: **11,405**
+     - `implicit_dispatch.dispatch_candidates_total`: **7,413**
+     - `implicit_dispatch.resolved_dispatches`: **124**
+     - `implicit_dispatch.unresolved_dispatches`: **7,289**
+   - **Exploratory trace counter observation:**
+     - `implicit_dispatch.dispatch_candidates_total`: **7,407** (delta **-6**)
+     - `implicit_dispatch.unresolved_dispatches`: **7,283** (delta **-6**)
+   - **Exact enumeration of the 6 excluded candidate dispatch sites:**
+     1. `pydantic_settings/sources/base.py`: `DefaultSettingsSource -> super().__init__() [PydanticBaseSettingsSource]` at `settings_cls.model_config` (1 site, record [648] on baseline).
+     2. `pydantic_settings/sources/base.py`: `InitSettingsSource.__init__` at `settings_cls.model_config` (2 sites, records [663] and [664] on baseline).
+     3. `pydantic_settings/sources/providers/dotenv.py`: `DotEnvSettingsSource.__init__` at `settings_cls.model_config` (3 sites, records [675], [676], and [677] on baseline).
+     *(Total = 1 + 2 + 3 = 6 candidate attribute access sites).*
+   - **Technical root-cause analysis:**
+     - On baseline `db8fb1dd34f02e1ac0edd50ed6d7cc65ad53ae24`, `settings_cls` had unresolved receiver type for `settings_cls.model_config`, generating an `unresolved` implicit descriptor `__get__` candidate for each of the 6 sites in `tr.calls`.
+     - When exploratory receiver type inference resolved `settings_cls -> BaseSettings` (or `Settings`), `StaticWalker._resolve_implicit_descriptor` inspected `BaseSettings.model_config` for descriptor protocol implementation (`__get__`).
+     - Because `BaseSettings.model_config` is a dictionary and does not implement a descriptor `__get__` method, `StaticWalker._resolve_implicit_descriptor` returned `outcome.kind == "no_dispatch"`.
+     - In `audit_harness/trace.py`, a `no_dispatch` outcome executes `self.implicit_resolved_non_descriptor_exclusion_total += 1` and produces no `CallRecord` in `calls`.
+     - This excluded exactly 6 candidate attribute access sites from `calls` and `implicit_dispatch_candidates_total`, causing both candidate and unresolved dispatch counts to decrease by 6.
+   - **Authoritative baseline invariant:** The single authoritative published baseline figures on `db8fb1dd34f02e1ac0edd50ed6d7cc65ad53ae24` remain strictly **7,413 dispatch candidates** and **7,289 unresolved dispatches**. The 7,407 / 7,283 counts are exploratory evidence only.
+
+3. **Canonical Baseline Snapshot (`db8fb1dd34f02e1ac0edd50ed6d7cc65ad53ae24`).**
+   - `calls_total`: **7420**
+   - `calls_unresolved`: **588**
+   - `exact_identity_policy`: **3059**
+   - `project_source_available`: **3768**
+   - `forbidden`: **5**
+   - `implicit_dispatch_candidates_total`: **7413**
+   - `implicit_dispatch_resolved`: **124**
+   - `implicit_dispatch_unresolved`: **7289**
+   - `syntax_sites_total`: **11405**
+   - `nodes_total`: **268**
+   - `nodes_unresolved`: **16**
+   - `roots_traced`: **25**
+   - `roots_with_error_total`: **0**
+   - `module_state_candidates`: **523**
+   - `module_state_unexplained`: **0**
+   - `exit_code`: **1**
+
+4. **CORRECTED PROSPECTIVE MAXIMUM MOVEMENT.**
+
+| Metric / Counter | Published Baseline (`db8fb1dd34f02e1ac0edd50ed6d7cc65ad53ae24`) | Corrected Prospective Post-State ($N_{\text{effective}} = 45$) | Projected Delta | Disposition |
+|:---|:---:|:---:|:---:|:---|
+| `calls_total` | **7,420** | **7,420** | **0** | Invariant |
+| `calls_unresolved` | **588** | **543** | **-45** | Authorized reduction ($N_{\text{effective}}=45$) |
+| `identity_resolution_buckets.exact_identity_policy` | **3,059** | **3,104** | **+45** | Authorized resolution ($N_{\text{effective}}=45$) |
+| `identity_resolution_buckets.project_source_available` | **3,768** | **3,768** | **0** | Invariant |
+| `identity_resolution_buckets.forbidden` | **5** | **5** | **0** | Invariant |
+| `identity_resolution_buckets.unresolved` | **588** | **543** | **-45** | Authorized reduction |
+| `roots_traced` | **25** | **25** | **0** | Invariant |
+| `nodes_total` | **268** | **268** | **0** | Invariant |
+| `nodes_unresolved` | **16** | **16** | **0** | Invariant |
+| `implicit_dispatch.syntax_sites_total` | **11,405** | **11,405** | **0** | Invariant |
+| `implicit_dispatch.dispatch_candidates_total` | **7,413** | **7,413** | **0** | Invariant |
+| `implicit_dispatch.resolved_dispatches` | **124** | **124** | **0** | Invariant |
+| `implicit_dispatch.unresolved_dispatches` | **7,289** | **7,289** | **0** | Invariant |
+| `module_state_candidates` | **523** | **523** | **0** | Invariant |
+| `module_state_unexplained` | **0** | **0** | **0** | Invariant |
+| `exit_code` | **1** | **1** | **0** | Invariant (HOLD) |
+
+5. **Implementation Proof Repair Requirements & Contract Hardening.**
+   - **Obligation B (Receiver Provenance & Scope Traversal):**
+     - **`cls`:** Future implementation must prove actual `BaseSettings` / subclass class receiver provenance; textual variable naming alone is insufficient.
+     - **`settings_cls`:** Future implementation must prove actual parameter binding, static type, or specialization provenance to `BaseSettings` / subclass. The variable name `settings_cls` alone is insufficient; enclosing Pydantic owner class alone is insufficient.
+     - **`self.config`:** Future implementation must prove `self` is an instance of `PydanticBaseSettingsSource` / subclass, and structural provenance must prove `self.config = settings_cls.model_config`. Invalid variable reassignment, mutation, or scope shadowing must immediately fail closed.
+     - Write-once invariance must be strictly enforced: any variable reassignment, mutation, or scope shadowing must immediately fail closed.
+   - **Obligation D (Container Type Invariance & Metaclass Safety):**
+     - Runtime invariant must be written exactly: `type(config_obj) is dict`.
+     - `ConfigDict` is typing/schema metadata (a `TypedDict` type alias) and the authorized runtime object must be an exact built-in `dict`.
+     - Reject: `dict` subclasses, `Mapping` subclasses, proxies, descriptor-produced objects, and dynamic/unknown containers.
+     - `_MISSING` is NOT successful proof: if class-static lookup returns `_MISSING` because `config` is assigned on the instance, implementation must prove assignment provenance rather than silently succeed.
+     - Static inspection must never execute arbitrary user-defined dunder methods (`__getattribute__`, `__getattr__`, `__call__`, `__bool__`, `__len__`) or custom metaclass hooks.
+   - **Obligation E (Target Callable Invariance & Policy Table Isolation):**
+     - Defense-in-depth requires both:
+       - **Trace layer:** `target is dict.get`
+       - **Identity layer:** `is_pydantic_settings_model_config_get=True` must NOT independently authorize an unrelated target. If target is not `dict.get`, the classifier must fail closed. Module/qualname text alone is insufficient.
+     - `EXACT_IDENTITY_POLICY` remains strictly at **87** entries and version `2026-09-05.1`. Global `builtins.dict.get` or `dict.get` remains firmly **REJECTED**.
+   - **Historical Task 38.13 Test Requirement:**
+     - Historical Task 38.13 test evidence in `tests/audit_harness/test_task_38_13_phase_a_mechanism.py` (which asserts `calls_unresolved == 588` and `exact_identity_policy == 3059` on baseline) must retain those assertions verbatim as historical regression evidence.
+     - Task 38.15 post-state assertions (`543 / 3104`) belong only in `tests/audit_harness/test_task_38_15_phase_a_mechanism.py`.
+   - **Mandatory Negative Controls:**
+     - All existing 22 negative controls defined in ADR-032 Section 5 remain mandatory.
+     - Future tests must explicitly cover: wrong `settings_cls` provenance, `self.config` without proven assignment provenance, `_MISSING` container proof, `dict` subclass, and wrong target with Task 38.15 mechanism flag true.
+
+6. **Toolchain Provenance.**
+   - Python: **3.12.13** (`/Users/aniketbhalerao/binance-ai-hedge-fund-os/.venv/bin/python`)
+   - pydantic: **2.13.4**
+   - pydantic_settings: **2.14.2**
+   - pytest: **9.1.1**
+   - Platform: **Darwin 25.6.0 (macOS arm64)**
+
+7. **Governance Invariants and Gate Disposition Reaffirmation.**
+   - **Policy table strictly isolated:** `EXACT_IDENTITY_POLICY` remains strictly at **87** entries and version `2026-09-05.1`. Global `builtins.dict.get` or `dict.get` remains firmly **REJECTED**.
+   - **Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on both the published baseline (`calls_unresolved=588`) and the corrected post-state (`calls_unresolved=543`): `nodes_unresolved=16`, `implicit_dispatch.unresolved_dispatches=7289`, `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.15 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
+
+
+
 ## Alternatives Considered
 - **No formal gate — treat the audit as informational only.** Rejected: an audit whose findings carry no consequence is easy to produce and easy to ignore; the entire point of running a structural audit before Task 39 is to make its outcome actionable.
 - **Gate on any open finding, regardless of severity.** Rejected: with 9 Low findings already on record (mostly `baseline: unknown` typing gaps and test-coverage notes), gating on every open item would block indefinitely on cosmetic issues unrelated to safety. The severity rubric exists precisely so the gate tracks what actually matters — a real reachable I/O/trading/inference/credential-leak path.
