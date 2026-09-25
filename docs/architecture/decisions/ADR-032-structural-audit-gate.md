@@ -969,6 +969,87 @@ Phase 0 projected `calls_unresolved` 901 → **702** (−199) with every other c
    - **Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on both the published baseline (`calls_unresolved=588`) and the corrected post-state (`calls_unresolved=543`): `nodes_unresolved=16`, `implicit_dispatch.unresolved_dispatches=7289`, `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.15 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
 
 
+**Task 38.15 Governance Phase 1.7 — historical-test semantics and pre-existing `builtins.dict.get` policy-state correction, 2026-09-25.** Per this ADR's Two-Phase Provenance, this section records a **governance-only** correction of three published Task 38.15 semantic errors identified by forensic reconciliation after published implementation `2a2d4ac747052faa061eccd926dd7105f5c0690d`. **Accepting reviewer:** Aniket Bhalerao — project owner/reviewer. Baseline of record: published canonical `origin/main` = `2a2d4ac747052faa061eccd926dd7105f5c0690d` (parent `594b704f9981e505f7e7493b3cace3a734f3064e`). **This phase is documentation-and-governance-only:** it changes no implementation code, no test, no evidence artifact, no gate predicate, and no `EXACT_IDENTITY_POLICY` entry. Prior published sections above remain preserved as historical record. This section **SUPERSEDES** only the live-census, green-suite, negative-control-count, and global-`dict.get`-rejection *semantics* named below; it does not erase those earlier sentences.
+
+**Supersession scope (exact).** The following published requirements are superseded as *current operative semantics*, while remaining visible above as historical record:
+
+1. Phase 1 item 5 last bullet (the requirement that `tests/audit_harness/test_task_38_13_phase_a_mechanism.py` “remain completely green” while still pinning live whole-system `588 / 3059` after a later authorized movement).
+2. Phase 1.4 item 5 “Historical Task 38.13 Test Requirement” (the requirement that the Task 38.13 test file retain `calls_unresolved == 588` and `exact_identity_policy == 3059` as a *live* `run_trace()` assertion after Task 38.15).
+3. Phase 1 item 8, Phase 1.4 item 5 Obligation E, and Phase 1.4 item 7 sentences stating that global `builtins.dict.get` or `dict.get` “remains firmly REJECTED,” insofar as those sentences describe the *current contents* of `EXACT_IDENTITY_POLICY`. The table already contains that key; what remains rejected is a *new* Task 38.15 table entry or any claim that the pre-existing key is sufficient proof for the 45 moved calls.
+
+This is supersession of live-census and policy-*wording* semantics, not history rewriting. Task 38.13's completed-phase evidence is not deleted or invalidated.
+
+1. **Historical Task 38.13 whole-system baseline evidence of record (immutable).**
+   Task 38.13's completed-phase whole-system census remains:
+   - `calls_unresolved` = **588**
+   - `identity_resolution_buckets.exact_identity_policy` = **3,059**
+   These values remain historically valid evidence of Task 38.13. Changing later live-assertion semantics does **not** alter or erase that record.
+
+2. **Live regression semantics after later authorized movements.**
+   Later authorized tasks may change whole-system totals. Historical task test files are **not** required to continue asserting old whole-system totals against the current live `run_trace()`.
+   - Historical **mechanism** tests remain live regression tests: proof obligations, safety properties, and mechanism-specific population/invariants that are still applicable.
+   - Historical **whole-system census** numbers are snapshot / evidence-of-record, not a current live invariant once a later authorized task has moved them exactly as governed.
+   - Current whole-system census belongs to the **current** task's census test.
+
+3. **Task 38.13 live mechanism invariants that remain required.**
+   For Task 38.13 specifically, live tests must continue to enforce mechanism-local invariants, including:
+   - proof obligations A–G for `inspect-signature-parameters-mappingproxy-items`
+   - hostile / non-execution safety (metaclass `__getattribute__` / `__getattr__` / `__call__` / `__signature__`, subject `__signature__`, `__bool__` / `__len__`, hostile descriptors)
+   - dual-grain mappingproxy accounting that remains true after Task 38.15:
+     - specialization grain: 115 explicit `mappingproxy.items` calls → 114 resolved / 1 unresolved
+     - trace-record grain: 230 records matching `parameters.items` → 114 resolved / 116 unresolved
+   Live tests are **not** required, after Task 38.15, to assert that the current live whole-system trace remains `588 / 3059`.
+
+4. **Green-suite semantics (replacement).**
+   The prior requirement that Task 38.13 must “retain `588 / 3059` in the live test file and remain completely green” is replaced with:
+   - Task 38.13 **mechanism** regression tests must remain green under the current repository.
+   - Task 38.13 historical whole-system census (`588 / 3059`) remains documented evidence, not a current live invariant.
+   - Later authorized audit movements must not be treated as regressions merely because historical global totals changed exactly as governed.
+   This does **not** authorize broad weakening of Task 38.13. Only whole-system historical totals receive snapshot / evidence semantics.
+
+5. **Task 38.15 owns the current live post-state.**
+   Task 38.15 live whole-system assertions belong only in `tests/audit_harness/test_task_38_15_phase_a_mechanism.py` (or a later task's own census test). The corrected intended live post-state, preserved from Phase 1.4, is:
+   - `roots_traced` = **25**
+   - `nodes_total` = **268**
+   - `nodes_unresolved` = **16**
+   - `calls_total` = **7,420**
+   - `calls_unresolved` = **543**
+   - `identity_resolution_buckets.exact_identity_policy` = **3,104**
+   - `identity_resolution_buckets.project_source_available` = **3,768**
+   - `identity_resolution_buckets.forbidden` = **5**
+   - `identity_resolution_buckets.unresolved` = **543**
+   - `implicit_dispatch.syntax_sites_total` = **11,405**
+   - `implicit_dispatch.dispatch_candidates_total` = **7,413**
+   - `implicit_dispatch.resolved_dispatches` = **124**
+   - `implicit_dispatch.unresolved_dispatches` = **7,289**
+   - `module_state_candidates` = **523**
+   - `module_state_unexplained` = **0**
+   - `exit_code` = **1**
+   Task 38.15 moved population remains **45**, split **27** `cls.model_config.get` / **7** `settings_cls.model_config.get` / **11** `self.config.get`, unexpected resolutions **0**. Dispatch candidates **7,413** / resolved **124** / unresolved **7,289** remain the canonical implicit-dispatch invariant (the exploratory `7,407 / 7,283` counts remain non-authoritative).
+
+6. **Negative-control populations are distinct and must not be conflated.**
+   - **Task 38.15 dedicated mechanism negative controls: 22.** All 22 remain mandatory in `tests/audit_harness/test_task_38_15_phase_a_mechanism.py`. No control may be removed.
+   - **Audit harness Requirement-7 / self-test controls: 10.** `run_audit` reports `negative_controls_detected = 10 / 10` for this generic self-test population (`audit_harness.self_test.run_self_tests()`).
+   These counters are not intended to match. `10 / 10` is not evidence of missing Task 38.15 controls, and governance does **not** require `run_audit.negative_controls_detected` to equal 22.
+
+7. **Pre-existing `builtins.dict.get` policy-table state (fact correction).**
+   `EXACT_IDENTITY_POLICY` remains strictly **87** entries, version **`2026-09-05.1`**. The exact key `"builtins.dict.get"` **already exists** in that table. It was introduced in Task 38.6 commit `8fd66cadacc52cc83902d4bd7ed004ee9ae3552b` with rationale `"CPython stdlib builtin: pure dict read, no I/O by definition."` Unflagged `classify_callable(dict.get, module="builtins", qualname="dict.get")` therefore already returns `exact_identity_policy` under that Task 38.6 rationale. Prior wording that “global `builtins.dict.get` or `dict.get` remains firmly REJECTED” is **factually incorrect as a description of the current policy table**.
+
+8. **Task 38.15 policy rule that remains (no new key; mechanism still required).**
+   - Task 38.15 authorizes **no new** global policy entry for `dict.get` / `builtins.dict.get`.
+   - Task 38.15 does **not** change the existing global `"builtins.dict.get"` entry.
+   - No policy-version bump is authorized (`2026-09-05.1` unchanged; 87 entries unchanged).
+   - Task 38.15's 45-call movement **must not** be justified solely by that pre-existing global key.
+   - Each of the 45 candidates must still satisfy the receiver-constrained `pydantic-settings-model-config-get` proof (Obligations A–G): authorized AST receiver shape (`cls.model_config.get` / `settings_cls.model_config.get` / `self.config.get`); `BaseSettings` / `PydanticBaseSettingsSource` provenance; safe non-executing inspection; `type(config_obj) is dict`; `target is dict.get`; correct argument shape; fail-closed on any incomplete proof.
+   - Identity rationale for the 45 moved calls remains **`pydantic-settings-model-config-get`**, not the generic Task 38.6 rationale.
+
+9. **Implementation freeze and next bounded work.**
+   The uncommitted Task 38.15 corrective implementation (mechanism-local `settings_cls` proof; restored `7413 / 7289` dispatch invariants; restored Task 38.13 historical file byte-identical to `594b704`) remains **frozen** by this phase. This governance commit authorizes no implementation change. Subsequent Phase A work may update only the Task 38.13 *live whole-system* assertion semantics as explicitly authorized here, while retaining Task 38.13 mechanism invariants and the Task 38.15 live post-state `543 / 3104`.
+
+**Non-goals — explicitly outside this correction.** No `EXACT_IDENTITY_POLICY` modification and no policy-version bump; no implementation or test change in this phase; no production or trading code changes; no M-8 or M-9 remediation; no Task 39 work; and **no attempt to clear the gate**.
+
+**Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on both the Task 38.13 historical baseline (`calls_unresolved=588`) and the Task 38.15 live post-state (`calls_unresolved=543`): `nodes_unresolved=16`, `implicit_dispatch.unresolved_dispatches=7289`, `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.15 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
+
 
 ## Alternatives Considered
 - **No formal gate — treat the audit as informational only.** Rejected: an audit whose findings carry no consequence is easy to produce and easy to ignore; the entire point of running a structural audit before Task 39 is to make its outcome actionable.
