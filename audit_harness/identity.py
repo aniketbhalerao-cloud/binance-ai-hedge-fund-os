@@ -800,6 +800,7 @@ def classify_callable(
     is_dataclass_generated: bool = False,
     is_namedtuple_generated: bool = False,
     is_inspect_signature_parameters_mappingproxy_items: bool = False,
+    is_pydantic_settings_model_config_get: bool = False,
 ) -> IdentityVerdict:
     """Classify one resolved live callable per Harness Requirement 4.
 
@@ -817,6 +818,11 @@ def classify_callable(
     calls on proven ``inspect.Signature`` instances: the caller must
     have structurally verified Obligations A–G before setting this flag --
     this function does not re-derive that fact either.
+    ``is_pydantic_settings_model_config_get`` is the Task 38.15
+    receiver-constrained discipline for ``model_config.get(...)`` /
+    ``self.config.get(...)`` calls on proven ``BaseSettings`` instances:
+    the caller must have structurally verified Obligations A–G before
+    setting this flag -- this function does not re-derive that fact either.
     """
     key = _identity_key(module, qualname)
 
@@ -824,6 +830,18 @@ def classify_callable(
         return IdentityVerdict(
             module, qualname, "forbidden", "Named forbidden operation.", False
         )
+
+    if is_pydantic_settings_model_config_get:
+        unwrapped = getattr(obj, "__func__", obj)
+        if unwrapped is dict.get:
+            return IdentityVerdict(
+                module or "builtins",
+                qualname or "dict.get",
+                "exact_identity_policy",
+                "pydantic-settings-model-config-get",
+                False,
+            )
+        return IdentityVerdict(module, qualname, "unresolved", None, False)
 
     # An individually-listed, reviewed exact-identity-policy entry is
     # authoritative and checked *before* attempting a generic source

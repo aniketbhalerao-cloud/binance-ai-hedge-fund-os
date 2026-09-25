@@ -253,6 +253,80 @@ def _is_safe_subject(cls: type) -> bool:
     return _is_safe_metaclass(type(cls))
 
 
+def _is_safe_pydantic_metaclass(meta: type) -> bool:
+    if not isinstance(meta, type):
+        return False
+    if meta is type:
+        return True
+    try:
+        mro = _type_mro_get(meta)
+    except Exception:
+        return False
+    for base in mro:
+        try:
+            d = _type_dict_get(base)
+        except Exception:
+            return False
+        if "__signature__" in d:
+            return False
+        if "__getattribute__" in d and d["__getattribute__"] not in (
+            type.__getattribute__,
+            object.__getattribute__,
+        ):
+            return False
+        if "__call__" in d and d["__call__"] is not type.__call__:
+            return False
+        if "__getattr__" in d:
+            mod = _type_module_get(base)
+            qn = _type_qualname_get(base)
+            if (
+                mod not in ("pydantic._internal._model_construction", "pydantic.main")
+                or qn != "ModelMetaclass"
+            ):
+                return False
+    return True
+
+
+def _is_safe_pydantic_subject(cls: type) -> bool:
+    if not isinstance(cls, type):
+        return False
+    try:
+        mro = _type_mro_get(cls)
+    except Exception:
+        return False
+    try:
+        from pydantic._internal._utils import LazyClassAttribute
+    except ImportError:
+        LazyClassAttribute = None
+    for base in mro:
+        try:
+            d = _type_dict_get(base)
+        except Exception:
+            return False
+        if "__signature__" in d:
+            sig_attr = d["__signature__"]
+            if not (
+                LazyClassAttribute is not None
+                and isinstance(sig_attr, LazyClassAttribute)
+            ):
+                return False
+        try:
+            mod = _type_module_get(base)
+        except Exception:
+            mod = ""
+        if (
+            base not in (object,)
+            and not (isinstance(mod, str) and mod.startswith("pydantic."))
+            and not (isinstance(mod, str) and mod.startswith("pydantic_settings."))
+        ):
+            if "__getattribute__" in d and d["__getattribute__"] not in (
+                object.__getattribute__,
+                type.__getattribute__,
+            ):
+                return False
+    return _is_safe_pydantic_metaclass(type(cls))
+
+
 def _static_get(obj: object, name: str) -> object:
     return inspect.getattr_static(obj, name, _MISSING)
 
@@ -624,14 +698,27 @@ class StaticWalker:
                 try:
                     hinted = eval(raw_ann, module_globals)  # noqa: S307 - project's own annotation source
                 except Exception:  # noqa: BLE001
-                    hinted = None
+                    try:
+                        from pydantic_settings import BaseSettings
+
+                        eval_globals = dict(module_globals)
+                        eval_globals["BaseSettings"] = BaseSettings
+                        hinted = eval(raw_ann, eval_globals)
+                    except Exception:
+                        hinted = None
             if hinted is not None and not isinstance(hinted, type):
-                # Unwrap `X | None` / `Optional[X]` to the one real
-                # non-None member -- a structural fact from the type
-                # itself (typing.get_args), not a guess.
-                args = [a for a in typing.get_args(hinted) if a is not type(None)]
-                if len(args) == 1 and isinstance(args[0], type):
-                    hinted = args[0]
+                origin = typing.get_origin(hinted)
+                if origin in (type, typing.Type):
+                    args = typing.get_args(hinted)
+                    if len(args) == 1 and isinstance(args[0], type):
+                        hinted = args[0]
+                else:
+                    # Unwrap `X | None` / `Optional[X]` to the one real
+                    # non-None member -- a structural fact from the type
+                    # itself (typing.get_args), not a guess.
+                    args = [a for a in typing.get_args(hinted) if a is not type(None)]
+                    if len(args) == 1 and isinstance(args[0], type):
+                        hinted = args[0]
             if isinstance(hinted, type):
                 impl = self.protocol_implementer.get(hinted, hinted)
                 if isinstance(impl, type):
@@ -1562,6 +1649,293 @@ class StaticWalker:
 
         return True
 
+    def _prove_pydantic_settings_model_config_get(
+        self,
+        node: ast.Call,
+        tree: ast.AST,
+        target: object = dict.get,
+        g: dict[str, object] | None = None,
+        loc: dict[str, object] | None = None,
+        owner_class: type | None = None,
+        param_hints: dict[str, type] | None = None,
+        local_var_types: dict[str, type] | None = None,
+    ) -> bool:
+        """Task 38.15: Prove Obligations A–G for a candidate
+        `pydantic-settings-model-config-get` call site.
+
+        Authorized syntactic forms:
+        1. `cls.model_config.get(...)` where cls is a BaseSettings subclass
+        2. `settings_cls.model_config.get(...)` where settings_cls is a BaseSettings subclass
+        3. `self.config.get(...)` where self is a PydanticBaseSettingsSource subclass
+
+        Obligations:
+        A. Direct AST call matching one of the 3 authorized forms with write-once / non-reassignment provenance.
+        B. Receiver proven to be BaseSettings / PydanticBaseSettingsSource subclass via type/specialization binding.
+        C. Non-execution safety: no custom __signature__, no hostile metaclass or dunder hooks.
+        D. Container invariance: runtime type of model_config/config is strictly `dict` (no custom mapping/descriptor).
+        E. Exact live `dict.get` callable identity defense-in-depth.
+        F. Direct attribute call shape with 1 or 2 positional arguments and 0 keywords.
+        G. Fail closed on any missing subject, ambiguous binding, or unproven condition.
+        """
+        if isinstance(target, dict) and local_var_types is None:
+            local_var_types = param_hints if param_hints is not None else {}
+            param_hints = owner_class if isinstance(owner_class, dict) else {}
+            owner_class = loc if isinstance(loc, type) else None
+            loc = g if g is not None else {}
+            g = target
+            target = dict.get
+
+        g = g or {}
+        loc = loc or {}
+        param_hints = param_hints or {}
+        local_var_types = local_var_types or {}
+
+        # Obligation F: Argument shape (1 or 2 positional arguments, 0 keywords)
+        if node.keywords or len(node.args) not in (1, 2):
+            return False
+
+        # Obligation E: Target callable identity defense-in-depth
+        if target is not None and target is not _MISSING and target is not dict.get:
+            unwrapped = getattr(target, "__func__", target)
+            if unwrapped is not dict.get:
+                return False
+
+        # Obligation A: Syntactic AST form matching
+        if not isinstance(node.func, ast.Attribute) or node.func.attr != "get":
+            return False
+        receiver = node.func.value
+
+        form: str | None = None
+        if (
+            isinstance(receiver, ast.Attribute)
+            and receiver.attr == "model_config"
+            and isinstance(receiver.value, ast.Name)
+            and receiver.value.id == "cls"
+        ):
+            form = "cls"
+        elif (
+            isinstance(receiver, ast.Attribute)
+            and receiver.attr == "model_config"
+            and isinstance(receiver.value, ast.Name)
+            and receiver.value.id == "settings_cls"
+        ):
+            form = "settings_cls"
+        elif (
+            isinstance(receiver, ast.Attribute)
+            and receiver.attr == "config"
+            and isinstance(receiver.value, ast.Name)
+            and receiver.value.id == "self"
+        ):
+            form = "self"
+        else:
+            return False
+
+        # Obligation A: Scope-level write-once / non-reassignment provenance
+        if form in ("cls", "settings_cls"):
+            var_name = form
+            for stmt in _shallow_descendants(tree):
+                if isinstance(stmt, ast.Assign):
+                    for t in stmt.targets:
+                        if isinstance(t, ast.Name) and t.id == var_name:
+                            return False
+                        if (
+                            isinstance(t, ast.Attribute)
+                            and t.attr == "model_config"
+                            and isinstance(t.value, ast.Name)
+                            and t.value.id == var_name
+                        ):
+                            return False
+                        if isinstance(t, (ast.Tuple, ast.List)):
+                            for elt in ast.walk(t):
+                                if isinstance(elt, ast.Name) and elt.id == var_name:
+                                    return False
+                elif isinstance(stmt, ast.AnnAssign):
+                    if isinstance(stmt.target, ast.Name) and stmt.target.id == var_name:
+                        return False
+                    if (
+                        isinstance(stmt.target, ast.Attribute)
+                        and stmt.target.attr == "model_config"
+                        and isinstance(stmt.target.value, ast.Name)
+                        and stmt.target.value.id == var_name
+                    ):
+                        return False
+                elif isinstance(stmt, ast.AugAssign):
+                    if isinstance(stmt.target, ast.Name) and stmt.target.id == var_name:
+                        return False
+                    if (
+                        isinstance(stmt.target, ast.Attribute)
+                        and stmt.target.attr == "model_config"
+                        and isinstance(stmt.target.value, ast.Name)
+                        and stmt.target.value.id == var_name
+                    ):
+                        return False
+                elif isinstance(stmt, ast.NamedExpr):
+                    if isinstance(stmt.target, ast.Name) and stmt.target.id == var_name:
+                        return False
+                elif isinstance(stmt, ast.Delete):
+                    for t in stmt.targets:
+                        if isinstance(t, ast.Name) and t.id == var_name:
+                            return False
+                        if (
+                            isinstance(t, ast.Attribute)
+                            and t.attr == "model_config"
+                            and isinstance(t.value, ast.Name)
+                            and t.value.id == var_name
+                        ):
+                            return False
+                        if isinstance(t, (ast.Tuple, ast.List)):
+                            for elt in ast.walk(t):
+                                if isinstance(elt, ast.Name) and elt.id == var_name:
+                                    return False
+        elif form == "self":
+            self_config_writes = 0
+            for stmt in _shallow_descendants(tree):
+                if isinstance(stmt, ast.Assign):
+                    for t in stmt.targets:
+                        if isinstance(t, ast.Name) and t.id == "self":
+                            return False
+                        if (
+                            isinstance(t, ast.Attribute)
+                            and t.attr == "config"
+                            and isinstance(t.value, ast.Name)
+                            and t.value.id == "self"
+                        ):
+                            self_config_writes += 1
+                        if isinstance(t, (ast.Tuple, ast.List)):
+                            for elt in ast.walk(t):
+                                if isinstance(elt, ast.Name) and elt.id == "self":
+                                    return False
+                elif isinstance(stmt, ast.AnnAssign):
+                    if isinstance(stmt.target, ast.Name) and stmt.target.id == "self":
+                        return False
+                    if (
+                        isinstance(stmt.target, ast.Attribute)
+                        and stmt.target.attr == "config"
+                        and isinstance(stmt.target.value, ast.Name)
+                        and stmt.target.value.id == "self"
+                    ):
+                        self_config_writes += 1
+                elif isinstance(stmt, ast.AugAssign):
+                    if isinstance(stmt.target, ast.Name) and stmt.target.id == "self":
+                        return False
+                    if (
+                        isinstance(stmt.target, ast.Attribute)
+                        and stmt.target.attr == "config"
+                        and isinstance(stmt.target.value, ast.Name)
+                        and stmt.target.value.id == "self"
+                    ):
+                        return False
+                elif isinstance(stmt, ast.NamedExpr):
+                    if isinstance(stmt.target, ast.Name) and stmt.target.id == "self":
+                        return False
+                elif isinstance(stmt, ast.Delete):
+                    for t in stmt.targets:
+                        if isinstance(t, ast.Name) and t.id == "self":
+                            return False
+                        if (
+                            isinstance(t, ast.Attribute)
+                            and t.attr == "config"
+                            and isinstance(t.value, ast.Name)
+                            and t.value.id == "self"
+                        ):
+                            return False
+                        if isinstance(t, (ast.Tuple, ast.List)):
+                            for elt in ast.walk(t):
+                                if isinstance(elt, ast.Name) and elt.id == "self":
+                                    return False
+            if self_config_writes > 1:
+                return False
+
+        try:
+            from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
+        except ImportError:
+            return False
+
+        # Obligation B, C, D: Receiver resolution, safety, and container invariance
+        if form == "cls":
+            candidate_cls = loc.get("cls", _MISSING)
+            if candidate_cls is _MISSING:
+                candidate_cls = g.get("cls", _MISSING)
+            if candidate_cls is _MISSING:
+                candidate_cls = param_hints.get("cls", _MISSING)
+            if candidate_cls is _MISSING:
+                candidate_cls = local_var_types.get("cls", _MISSING)
+            if candidate_cls is _MISSING:
+                candidate_cls = owner_class
+            if candidate_cls is _MISSING or not isinstance(candidate_cls, type):
+                return False
+
+            if not issubclass(candidate_cls, BaseSettings):
+                return False
+            if not _is_safe_pydantic_subject(candidate_cls):
+                return False
+            if not _is_safe_pydantic_metaclass(type(candidate_cls)):
+                return False
+
+            raw_config = _safe_raw_class_attribute(candidate_cls, "model_config")
+            if raw_config is None or type(raw_config) is not dict:
+                return False
+            return True
+
+        elif form == "settings_cls":
+            candidate_cls = loc.get("settings_cls", _MISSING)
+            if candidate_cls is _MISSING:
+                candidate_cls = g.get("settings_cls", _MISSING)
+            if candidate_cls is _MISSING:
+                candidate_cls = param_hints.get("settings_cls", _MISSING)
+            if candidate_cls is _MISSING:
+                candidate_cls = local_var_types.get("settings_cls", _MISSING)
+            if candidate_cls is _MISSING:
+                if (
+                    owner_class is not None
+                    and isinstance(owner_class, type)
+                    and issubclass(owner_class, BaseSettings)
+                ):
+                    candidate_cls = owner_class
+            if candidate_cls is _MISSING or not isinstance(candidate_cls, type):
+                return False
+
+            if not issubclass(candidate_cls, BaseSettings):
+                return False
+            if not _is_safe_pydantic_subject(candidate_cls):
+                return False
+            if not _is_safe_pydantic_metaclass(type(candidate_cls)):
+                return False
+
+            raw_config = _safe_raw_class_attribute(candidate_cls, "model_config")
+            if raw_config is None or type(raw_config) is not dict:
+                return False
+            return True
+
+        elif form == "self":
+            receiver_cls = None
+            if owner_class is not None and isinstance(owner_class, type):
+                receiver_cls = owner_class
+            elif "self" in local_var_types and isinstance(local_var_types["self"], type):
+                receiver_cls = local_var_types["self"]
+            elif "self" in param_hints and isinstance(param_hints["self"], type):
+                receiver_cls = param_hints["self"]
+            elif "self" in loc:
+                val = loc["self"]
+                receiver_cls = val if isinstance(val, type) else type(val)
+
+            if receiver_cls is None or not isinstance(receiver_cls, type):
+                return False
+
+            if not issubclass(receiver_cls, PydanticBaseSettingsSource):
+                return False
+            if not _is_safe_pydantic_subject(receiver_cls):
+                return False
+            if not _is_safe_pydantic_metaclass(type(receiver_cls)):
+                return False
+
+            raw_config = _safe_raw_class_attribute(receiver_cls, "config")
+            if raw_config is not None and type(raw_config) is not dict:
+                return False
+            return True
+
+        return False
+
     def _record_call(
         self,
         site_label: str,
@@ -1570,6 +1944,7 @@ class StaticWalker:
         mechanism: str,
         *,
         is_inspect_signature_parameters_mappingproxy_items: bool = False,
+        is_pydantic_settings_model_config_get: bool = False,
     ) -> IdentityVerdict | None:
         callee_text = ast.unparse(node.func)
         if mechanism == "local-helper-inline":
@@ -1602,6 +1977,7 @@ class StaticWalker:
             module=module,
             qualname=qualname,
             is_inspect_signature_parameters_mappingproxy_items=is_inspect_signature_parameters_mappingproxy_items,
+            is_pydantic_settings_model_config_get=is_pydantic_settings_model_config_get,
         )
         self.call_records.append(
             CallRecord(site_label, callee_text, mechanism, verdict)
@@ -2728,12 +3104,33 @@ class StaticWalker:
                         node, tree, target, g, loc, local_var_types
                     )
                 )
+
+            is_pydantic_model_config_get = False
+            if (
+                isinstance(node.func, ast.Attribute)
+                and node.func.attr == "get"
+            ):
+                if self._prove_pydantic_settings_model_config_get(
+                    node,
+                    tree,
+                    target,
+                    g,
+                    loc,
+                    owner_class,
+                    param_hints,
+                    local_var_types,
+                ):
+                    is_pydantic_model_config_get = True
+                    target = dict.get
+                    mechanism = "pydantic-settings-model-config-get"
+
             call_verdict = self._record_call(
                 site_label,
                 node,
                 target,
                 mechanism,
                 is_inspect_signature_parameters_mappingproxy_items=is_insp_sig_mappingproxy,
+                is_pydantic_settings_model_config_get=is_pydantic_model_config_get,
             )
 
             if inspect.isfunction(target) or inspect.ismethod(target):
