@@ -487,28 +487,21 @@ def test_exact_identity_policy_isolation_and_size() -> None:
 def test_trace_dual_grain_accounting_and_audit_totals() -> None:
     tr = run_trace()
 
-    # 1. Total calls and unresolved counts
+    # 1. Explicit-call population (invariant across Task 38.15).
+    # Live whole-system unresolved / exact_identity_policy totals are
+    # Task 38.15 census (543 / 3104), not a Task 38.13 live invariant.
     explicit_calls = tr.explicit_calls
     assert len(explicit_calls) == 7420
-    assert tr.calls_unresolved in (588, 543)
 
-    # 2. Identity resolution buckets
+    # 2. Identity-resolution buckets that remain Task 38.13-invariant.
     buckets = {
         "project_source_available": sum(
             1 for c in explicit_calls if c.verdict.category == "project_source_available"
         ),
-        "exact_identity_policy": sum(
-            1 for c in explicit_calls if c.verdict.category == "exact_identity_policy"
-        ),
         "forbidden": sum(
             1 for c in explicit_calls if c.verdict.category == "forbidden"
         ),
-        "unresolved": sum(
-            1 for c in explicit_calls if c.verdict.category == "unresolved"
-        ),
     }
-    assert buckets["exact_identity_policy"] in (3059, 3104)
-    assert buckets["unresolved"] in (588, 543)
     assert buckets["project_source_available"] == 3768
     assert buckets["forbidden"] == 5
 

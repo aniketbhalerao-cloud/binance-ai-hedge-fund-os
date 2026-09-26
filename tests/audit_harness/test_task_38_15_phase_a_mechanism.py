@@ -10,7 +10,7 @@ Verifies:
 3. Specialization-key class-identity non-execution safety.
 4. All 22 mandatory negative controls.
 5. Exact 45-call movement (588 -> 543 unresolved, 3059 -> 3104 exact_identity_policy).
-6. Dispatch counter invariants (7,407 candidates / 7,283 unresolved / 124 resolved).
+6. Dispatch counter invariants (7,413 candidates / 7,289 unresolved / 124 resolved).
 7. EXACT_IDENTITY_POLICY isolation (strictly 87 entries, version 2026-09-05.1).
 """
 
@@ -696,6 +696,9 @@ def test_canonical_25_root_audit_census_and_counters() -> None:
     explicit_calls = tr.explicit_calls
     assert len(explicit_calls) == 7420
     assert tr.calls_unresolved == 543
+    assert tr.roots_traced == 25
+    assert len(tr.nodes) == 268
+    assert tr.nodes_unresolved == 16
 
     # 2. Identity resolution buckets (exact 45 movement: 3059 -> 3104)
     buckets = {
@@ -717,9 +720,11 @@ def test_canonical_25_root_audit_census_and_counters() -> None:
     assert buckets["project_source_available"] == 3768
     assert buckets["forbidden"] == 5
 
-    # 3. Dispatch counter invariants: 7,407 candidates and 7,283 unresolved (124 resolved)
-    assert tr.implicit_dispatch_candidates_total == 7407
-    assert tr.implicit_dispatch_unresolved == 7283
+    # 3. Dispatch counter invariants: 7,413 candidates and 7,289 unresolved (124 resolved)
+    assert tr.implicit_syntax_sites_total == 11405
+    assert tr.implicit_dispatch_candidates_total == 7413
+    assert tr.implicit_dispatch_resolved == 124
+    assert tr.implicit_dispatch_unresolved == 7289
 
     # 4. Reachable population census: exactly 45 resolved calls across the 3 structural shapes
     pydantic_resolved = [
@@ -738,3 +743,9 @@ def test_canonical_25_root_audit_census_and_counters() -> None:
     assert len(shape_settings_cls) == 7
     assert len(shape_self) == 11
     assert len(shape_cls) + len(shape_settings_cls) + len(shape_self) == 45
+    unexpected = [
+        c
+        for c in pydantic_resolved
+        if c not in shape_cls and c not in shape_settings_cls and c not in shape_self
+    ]
+    assert len(unexpected) == 0

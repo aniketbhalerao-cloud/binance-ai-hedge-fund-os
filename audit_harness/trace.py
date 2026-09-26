@@ -698,27 +698,14 @@ class StaticWalker:
                 try:
                     hinted = eval(raw_ann, module_globals)  # noqa: S307 - project's own annotation source
                 except Exception:  # noqa: BLE001
-                    try:
-                        from pydantic_settings import BaseSettings
-
-                        eval_globals = dict(module_globals)
-                        eval_globals["BaseSettings"] = BaseSettings
-                        hinted = eval(raw_ann, eval_globals)
-                    except Exception:
-                        hinted = None
+                    hinted = None
             if hinted is not None and not isinstance(hinted, type):
-                origin = typing.get_origin(hinted)
-                if origin in (type, typing.Type):
-                    args = typing.get_args(hinted)
-                    if len(args) == 1 and isinstance(args[0], type):
-                        hinted = args[0]
-                else:
-                    # Unwrap `X | None` / `Optional[X]` to the one real
-                    # non-None member -- a structural fact from the type
-                    # itself (typing.get_args), not a guess.
-                    args = [a for a in typing.get_args(hinted) if a is not type(None)]
-                    if len(args) == 1 and isinstance(args[0], type):
-                        hinted = args[0]
+                # Unwrap `X | None` / `Optional[X]` to the one real
+                # non-None member -- a structural fact from the type
+                # itself (typing.get_args), not a guess.
+                args = [a for a in typing.get_args(hinted) if a is not type(None)]
+                if len(args) == 1 and isinstance(args[0], type):
+                    hinted = args[0]
             if isinstance(hinted, type):
                 impl = self.protocol_implementer.get(hinted, hinted)
                 if isinstance(impl, type):
@@ -1892,6 +1879,28 @@ class StaticWalker:
                     and issubclass(owner_class, BaseSettings)
                 ):
                     candidate_cls = owner_class
+            if candidate_cls is _MISSING:
+                nodes_to_search: list[ast.AST] = []
+                if isinstance(tree, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    nodes_to_search.append(tree)
+                elif hasattr(tree, "body"):
+                    for b in tree.body:
+                        if isinstance(b, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                            nodes_to_search.append(b)
+                for func_node in nodes_to_search:
+                    all_params = (
+                        func_node.args.args
+                        + func_node.args.posonlyargs
+                        + func_node.args.kwonlyargs
+                    )
+                    for arg in all_params:
+                        if arg.arg == "settings_cls" and arg.annotation is not None:
+                            ann_str = ast.unparse(arg.annotation)
+                            if "BaseSettings" in ann_str:
+                                candidate_cls = BaseSettings
+                                break
+                    if candidate_cls is not _MISSING:
+                        break
             if candidate_cls is _MISSING or not isinstance(candidate_cls, type):
                 return False
 
