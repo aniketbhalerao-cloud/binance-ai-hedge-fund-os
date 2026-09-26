@@ -20,15 +20,45 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: '3.12.13'
 
       - name: Upgrade pip
         run: |
           python -m pip install --upgrade pip
 
-      - name: Install Dependencies
+      - name: Install Canonical Task 38 Toolchain
         run: |
-          python -m pip install -e . pytest
+          python -m pip install \
+            "pydantic==2.13.4" \
+            "pydantic-settings==2.14.2" \
+            "python-dotenv==1.2.2" \
+            "pytest==9.1.1"
+          python -m pip install --no-deps -e .
+
+      - name: Verify Canonical Toolchain Versions
+        run: |
+          python -c '
+          import sys
+          import importlib.metadata
+
+          py_ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+          print(f"Python: {py_ver}")
+          assert py_ver == "3.12.13", f"Expected Python 3.12.13, got {py_ver}"
+
+          expected_versions = {
+              "pydantic": "2.13.4",
+              "pydantic-settings": "2.14.2",
+              "python-dotenv": "1.2.2",
+              "pytest": "9.1.1",
+          }
+
+          for pkg, expected in expected_versions.items():
+              actual = importlib.metadata.version(pkg)
+              print(f"{pkg}: {actual}")
+              assert actual == expected, f"Expected {pkg}=={expected}, got {actual}"
+
+          print("All canonical toolchain versions verified successfully.")
+          '
 
       - name: Run Test Suite
         run: |
