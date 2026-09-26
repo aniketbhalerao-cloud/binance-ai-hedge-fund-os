@@ -25,6 +25,7 @@ anything other than forbidden.
 
 from __future__ import annotations
 
+import builtins
 import collections
 import inspect
 import textwrap
@@ -792,6 +793,40 @@ def is_namedtuple_generated_new(cls: type, new_method: object) -> bool:
     return _generated_new_body_matches_reference(own_new, fields)
 
 
+def _capture_canonical_builtins_ord() -> object:
+    """Capture and structurally authenticate standard library builtins.ord at startup.
+
+    Enforces Model A (Trusted-Startup Model) non-executively without calling the
+    candidate function and without using `assert` statements (which are stripped under
+    python -O / -OO).
+    """
+    candidate = getattr(builtins, "ord", None)
+    if type(candidate) is not types.BuiltinFunctionType:
+        raise RuntimeError(
+            "Startup invariant failed: builtins.ord is not BuiltinFunctionType"
+        )
+    if getattr(candidate, "__module__", None) != "builtins":
+        raise RuntimeError(
+            "Startup invariant failed: builtins.ord.__module__ is not 'builtins'"
+        )
+    if getattr(candidate, "__name__", None) != "ord":
+        raise RuntimeError(
+            "Startup invariant failed: builtins.ord.__name__ is not 'ord'"
+        )
+    if getattr(candidate, "__qualname__", None) != "ord":
+        raise RuntimeError(
+            "Startup invariant failed: builtins.ord.__qualname__ is not 'ord'"
+        )
+    if getattr(candidate, "__self__", None) is not builtins:
+        raise RuntimeError(
+            "Startup invariant failed: builtins.ord.__self__ is not builtins"
+        )
+    return candidate
+
+
+_CANONICAL_BUILTINS_ORD: object = _capture_canonical_builtins_ord()
+
+
 def classify_callable(
     obj: object,
     *,
@@ -801,6 +836,7 @@ def classify_callable(
     is_namedtuple_generated: bool = False,
     is_inspect_signature_parameters_mappingproxy_items: bool = False,
     is_pydantic_settings_model_config_get: bool = False,
+    is_builtin_ord_canonical: bool = False,
 ) -> IdentityVerdict:
     """Classify one resolved live callable per Harness Requirement 4.
 
@@ -823,6 +859,10 @@ def classify_callable(
     ``self.config.get(...)`` calls on proven ``BaseSettings`` instances:
     the caller must have structurally verified Obligations A–G before
     setting this flag -- this function does not re-derive that fact either.
+    ``is_builtin_ord_canonical`` is the Task 38.16 discipline for
+    ``builtins.ord`` calls proven to originate from direct built-in lookup or
+    write-once local alias: authorization requires both this provenance flag
+    and exact object identity against ``_CANONICAL_BUILTINS_ORD``.
     """
     key = _identity_key(module, qualname)
 
@@ -839,6 +879,18 @@ def classify_callable(
                 qualname or "dict.get",
                 "exact_identity_policy",
                 "pydantic-settings-model-config-get",
+                False,
+            )
+        return IdentityVerdict(module, qualname, "unresolved", None, False)
+
+    if is_builtin_ord_canonical:
+        unwrapped = obj.__func__ if type(obj) is types.MethodType else obj
+        if unwrapped is _CANONICAL_BUILTINS_ORD:
+            return IdentityVerdict(
+                module or "builtins",
+                qualname or "ord",
+                "exact_identity_policy",
+                "builtins.ord-canonical-sentinel",
                 False,
             )
         return IdentityVerdict(module, qualname, "unresolved", None, False)

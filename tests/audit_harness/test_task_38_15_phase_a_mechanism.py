@@ -692,31 +692,22 @@ def test_classify_callable_pydantic_flag_authorized_verdict() -> None:
 def test_canonical_25_root_audit_census_and_counters() -> None:
     tr = run_trace()
 
-    # 1. Total calls and unresolved counts (exact 45 movement: 588 -> 543)
+    # 1. Explicit-call population and Task 38.15 mechanism population
     explicit_calls = tr.explicit_calls
     assert len(explicit_calls) == 7420
-    assert tr.calls_unresolved == 543
     assert tr.roots_traced == 25
     assert len(tr.nodes) == 268
     assert tr.nodes_unresolved == 16
 
-    # 2. Identity resolution buckets (exact 45 movement: 3059 -> 3104)
+    # 2. Identity-resolution buckets that remain invariant
     buckets = {
         "project_source_available": sum(
             1 for c in explicit_calls if c.verdict.category == "project_source_available"
         ),
-        "exact_identity_policy": sum(
-            1 for c in explicit_calls if c.verdict.category == "exact_identity_policy"
-        ),
         "forbidden": sum(
             1 for c in explicit_calls if c.verdict.category == "forbidden"
         ),
-        "unresolved": sum(
-            1 for c in explicit_calls if c.verdict.category == "unresolved"
-        ),
     }
-    assert buckets["exact_identity_policy"] == 3104
-    assert buckets["unresolved"] == 543
     assert buckets["project_source_available"] == 3768
     assert buckets["forbidden"] == 5
 

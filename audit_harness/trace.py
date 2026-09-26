@@ -40,6 +40,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from audit_harness.identity import (
+    _CANONICAL_BUILTINS_ORD,
     IdentityVerdict,
     classify_callable,
     defining_module_of_method,
@@ -1954,6 +1955,7 @@ class StaticWalker:
         *,
         is_inspect_signature_parameters_mappingproxy_items: bool = False,
         is_pydantic_settings_model_config_get: bool = False,
+        is_builtin_ord_canonical: bool = False,
     ) -> IdentityVerdict | None:
         callee_text = ast.unparse(node.func)
         if mechanism == "local-helper-inline":
@@ -1987,6 +1989,7 @@ class StaticWalker:
             qualname=qualname,
             is_inspect_signature_parameters_mappingproxy_items=is_inspect_signature_parameters_mappingproxy_items,
             is_pydantic_settings_model_config_get=is_pydantic_settings_model_config_get,
+            is_builtin_ord_canonical=is_builtin_ord_canonical,
         )
         self.call_records.append(
             CallRecord(site_label, callee_text, mechanism, verdict)
@@ -3133,6 +3136,14 @@ class StaticWalker:
                     target = dict.get
                     mechanism = "pydantic-settings-model-config-get"
 
+            is_ord_canonical = False
+            if mechanism in ("builtins-lookup", "local-callable-alias"):
+                unwrapped = (
+                    target.__func__ if type(target) is types.MethodType else target
+                )
+                if unwrapped is _CANONICAL_BUILTINS_ORD:
+                    is_ord_canonical = True
+
             call_verdict = self._record_call(
                 site_label,
                 node,
@@ -3140,6 +3151,7 @@ class StaticWalker:
                 mechanism,
                 is_inspect_signature_parameters_mappingproxy_items=is_insp_sig_mappingproxy,
                 is_pydantic_settings_model_config_get=is_pydantic_model_config_get,
+                is_builtin_ord_canonical=is_ord_canonical,
             )
 
             if inspect.isfunction(target) or inspect.ismethod(target):
