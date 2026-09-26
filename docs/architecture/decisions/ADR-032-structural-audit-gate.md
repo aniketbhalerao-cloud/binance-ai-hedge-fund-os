@@ -1051,6 +1051,153 @@ This is supersession of live-census and policy-*wording* semantics, not history 
 **Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on both the Task 38.13 historical baseline (`calls_unresolved=588`) and the Task 38.15 live post-state (`calls_unresolved=543`): `nodes_unresolved=16`, `implicit_dispatch.unresolved_dispatches=7289`, `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.15 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
 
 
+**Task 38.16 Governance Phase 1.1 — human-approved prospective authorization and specification of `builtins-ord-canonical-sentinel` exact-object mechanism, 2026-09-26.** Per this ADR's Two-Phase Provenance (requiring formal mechanism specification and explicit human governance review before any implementation or commit), this section records the human-approved prospective authorization and specification of exactly one new exact-object resolution mechanism: `builtins-ord-canonical-sentinel`. **Accepting reviewer:** Aniket Bhalerao — Project Owner / Human Governance Reviewer. **Human approval recorded:** 2026-09-26. Task 38.16 Governance Phase 1.1 prospective authorization is approved for governance commit. This approval authorizes ONLY the documented prospective mechanism and subsequent bounded implementation work; it does NOT authorize Task 39, does NOT clear ADR-032 HOLD, and does NOT authorize live trading or production deployment. Baseline of record: published canonical baseline commit `f40a996b7af86898e843010e754ca3006c59bd5c`, clean (`git diff` and `git diff --cached` both empty). **This phase is documentation-and-governance-only:** it changes no implementation code, no test, no evidence artifact, no gate predicate, and no `EXACT_IDENTITY_POLICY` entry.
+
+1. **Governed Candidate and Population Characterization.**
+   - **Mechanism identifier:** `builtins-ord-canonical-sentinel`
+   - **Target callable:** Authentic CPython standard library `builtins.ord` captured at trusted audit-harness initialization.
+   - **Authorized population scope ($N = 10$):** Exactly 10 unresolved explicit call records in the whole-system 25-root audit trace:
+     - **Direct `builtins-lookup` (4 calls):**
+       - `re/_parser.py:360` in `_class_escape()`
+       - `re/_parser.py:375` in `_class_escape()`
+       - `re/_parser.py:420` in `_escape()`
+       - `re/_parser.py:435` in `_escape()`
+     - **Local callable alias `_ord = ord` (6 calls):**
+       - `re/_parser.py:496` in `_parse()`
+       - `re/_parser.py:502` in `_parse()`
+       - `re/_parser.py:532` in `_parse()`
+       - `re/_parser.py:534` in `_parse()`
+       - `re/_parser.py:536` in `_parse()`
+       - `re/_parser.py:542` in `_parse()`
+   - **Diagnostic vs. Canonical Baseline Reconciliation:**
+     - The sole governed canonical metric population is `tr.explicit_calls` (**7,420 calls** baseline).
+     - Diagnostic super-population figures (such as `tr.calls` = 14,894, combining 7,420 explicit calls and 7,474 implicit descriptor dispatch candidates; unpartitioned raw unresolved sums of 557 and 547; and 14 core unresolved type nodes) are non-canonical diagnostic aggregations and must not replace canonical ADR gate counters.
+
+2. **Threat Model and Trust Boundaries.**
+   - **Operating Trust Model: Trusted-Startup Model (Model A):**
+     - CPython standard built-in bindings are assumed authentic at the exact instant `audit_harness.identity` is imported during interpreter startup.
+     - The authentic `ord` object reference is captured once during module initialization into a stable module-private captured reference (`_CANONICAL_BUILTINS_ORD`).
+     - Modifying the live `builtins.ord` binding after capture does not alter the object referenced by the captured sentinel.
+     - This does NOT claim the Python module variable itself is cryptographically or language-level immutable; deliberate mutation of `audit_harness` internals is outside this mechanism's ordinary source-analysis guarantee unless separately governed.
+     - Subsequent audit classification strictly compares candidate target object identity against the captured sentinel reference.
+   - **Explicit Non-Claims and Residual Boundary:**
+     - Does NOT claim cryptographic resistance to arbitrary in-process memory tampering occurring prior to `audit_harness` initialization (Model B).
+     - Does NOT claim userland Python independently proves the interpreter binary authentic.
+     - Pre-import hostile process compromise is outside this mechanism's pure-Python identity guarantee and must be addressed separately by the trusted execution environment and applicable process-isolation/integrity controls.
+     - Task 38.16 does not attest that any particular containerization or process-isolation control is present or sufficient.
+
+3. **Required Sentinel Capture Design.**
+   - **Rejection of `assert` Statements for Security Validation:**
+     - Python optimization flags (`python -O` and `-OO`) set `__debug__ = False` and completely strip all `assert` statements from compiled bytecode.
+     - Any security or integrity check using `assert` fails open under optimized runtimes and is strictly **REJECTED**.
+     - All sentinel integrity checks must use explicit conditional control flow with concrete runtime exceptions (`if condition: raise RuntimeError(...)`).
+   - **Rejection of Candidate Invocation for Authentication:**
+     - Invoking a candidate callable during startup validation (e.g. `candidate("A") == 65`) executes arbitrary code if a hostile substitute was placed in `builtins.ord` before startup.
+     - Candidate invocation during initialization or audit classification is strictly **FORBIDDEN**.
+   - **Fail-Closed Structural Introspection:**
+     - Initialization must verify candidate structural invariants non-executively:
+       - `type(candidate) is types.BuiltinFunctionType`
+       - `getattr(candidate, "__module__", None) == "builtins"`
+       - `getattr(candidate, "__name__", None) == "ord"`
+       - `getattr(candidate, "__qualname__", None) == "ord"`
+       - `getattr(candidate, "__self__", None) is builtins`
+     - Failure of any check raises an explicit `RuntimeError` at module import time, failing closed.
+     - The validated object is stored in a module-private reference captured once at trusted audit-harness initialization (`_CANONICAL_BUILTINS_ORD`).
+
+4. **Two-Factor Defense-in-Depth Authorization.**
+   Authorization of any `builtins.ord` call requires satisfying two independent factors simultaneously:
+   - **Factor A (Walker Provenance):** The walker must affirmatively prove the call site resolved through an authorized provenance path (`builtins-lookup` or write-once `local-callable-alias` where `_ord = ord`), signaled via dedicated classifier argument `is_builtin_ord_canonical=True`.
+   - **Factor B (Exact Object Identity):** The resolved target object must satisfy exact object identity `target is _CANONICAL_BUILTINS_ORD`.
+   - **Fail-Closed Requirements:**
+     - Provenance flag `is_builtin_ord_canonical=True` alone MUST NOT authorize.
+     - Module/qualname strings (`module="builtins"`, `qualname="ord"`) alone MUST NOT authorize.
+     - Live mutable binding `builtins.ord` MUST NOT be used for post-capture identity comparisons.
+     - Any wrong target, mutated callable, or spoofed object with `is_builtin_ord_canonical=True` MUST fail closed to `category="unresolved"`, `rationale=None`.
+
+5. **Authorized Resolution Paths.**
+   Authorized resolution paths are strictly bounded to:
+   1. Direct built-in lookup in an analyzed module resolving to canonical `ord`.
+   2. Existing `local-callable-alias` resolution where write-once alias provenance proves `_ord = ord` within the enclosing function scope, resolving to the same canonical sentinel.
+   - Any alias reassignment, re-binding (e.g., `_ord = ord; _ord = len; _ord(x)`), ambiguity, or shadowing MUST fail closed to `unresolved`.
+
+6. **Global Policy Isolation and Invariant Reaffirmation.**
+   - **No New Global Table Entries:** Task 38.16 does NOT add `"builtins.ord"` or `"ord"` to `EXACT_IDENTITY_POLICY`.
+   - **Rationale for Isolation:** `EXACT_IDENTITY_POLICY` is string-keyed by module and qualname; string matching alone cannot verify CPython object identity or provenance.
+   - **Policy Invariants:**
+     - `len(EXACT_IDENTITY_POLICY)` remains strictly **87** entries.
+     - `EXACT_IDENTITY_POLICY_VERSION` remains strictly `"2026-09-05.1"`.
+     - New global keys added: **0**.
+   - **Classification Result:** Handled via dedicated mechanism branch returning `category="exact_identity_policy"` with `rationale="builtins.ord-canonical-sentinel"` and `is_policy_exact=False`, consistent with mechanism isolation established in Tasks 38.13 and 38.15.
+
+7. **Execution-Safety Evidence and Sibling Exclusions.**
+   - **Empirical Execution-Safety Boundaries of CPython 3.12 `ord`:**
+     - Accepts `str`, `bytes`, and `bytearray` representations verified strictly through C-level type checks.
+     - Directly extracts numeric character/byte representations at C level without executing conversion protocols (`__index__`, `__int__`, `__trunc__`).
+     - Hostile security probes demonstrated zero Python callback execution through `__str__`, `__repr__`, `__bytes__`, `__len__`, `__getitem__`, `__iter__`, `__getattr__`, `__buffer__`, or conversion hooks.
+     - Hostile subclasses of `str`, `bytes`, and `bytearray` overriding dunder methods were not invoked by `ord`.
+     - Arbitrary unsupported types fail immediately with C-level `TypeError` without userland hook dispatch.
+     - No filesystem, network, or process boundary is introduced.
+     - *Boundary Note:* No claim is made of "zero memory allocation", and safety properties are not generalized to sibling built-ins.
+   - **Strict Sibling Exclusions:**
+     - This proposed authorization applies solely to `builtins.ord`.
+     - It does NOT authorize `builtins.chr`, `builtins.int`, `builtins.range`, `builtins.iter`, `builtins.next`, `builtins.hasattr`, `bin`, `hex`, `oct`, or any other built-in callable. Sibling protocol risks remain governed separately.
+
+8. **PROSPECTIVE AUTHORIZED POST-STATE — NOT YET IMPLEMENTED.**
+
+| Metric / Counter | Published Canonical Baseline (`f40a996b7af86898e843010e754ca3006c59bd5c`) | Prospective Authorized Post-State ($N = 10$) | Projected Delta | Disposition |
+| :--- | :---: | :---: | :---: | :--- |
+| `calls_total` | **7,420** | **7,420** | **0** | Invariant |
+| `calls_unresolved` | **543** | **533** | **-10** | Authorized reduction ($N = 10$) |
+| `identity_resolution_buckets.exact_identity_policy` | **3,104** | **3,114** | **+10** | Authorized resolution ($N = 10$) |
+| `identity_resolution_buckets.project_source_available` | **3,768** | **3,768** | **0** | Invariant |
+| `identity_resolution_buckets.forbidden` | **5** | **5** | **0** | Invariant |
+| `identity_resolution_buckets.unresolved` | **543** | **533** | **-10** | Authorized reduction |
+| `roots_traced` | **25** | **25** | **0** | Invariant |
+| `nodes_total` | **268** | **268** | **0** | Invariant |
+| `nodes_unresolved` | **16** | **16** | **0** | Invariant |
+| `implicit_dispatch.syntax_sites_total` | **11,405** | **11,405** | **0** | Invariant |
+| `implicit_dispatch.dispatch_candidates_total` | **7,413** | **7,413** | **0** | Invariant |
+| `implicit_dispatch.resolved_dispatches` | **124** | **124** | **0** | Invariant |
+| `implicit_dispatch.unresolved_dispatches` | **7,289** | **7,289** | **0** | Invariant |
+| `module_state_candidates` | **523** | **523** | **0** | Invariant |
+| `module_state_unexplained` | **0** | **0** | **0** | Invariant |
+| `exit_code` | **1** | **1** | **0** | Invariant (HOLD) |
+
+9. **Required Implementation Negative Controls (Phase A Contract).**
+   Future implementation must provide dedicated regression test coverage for at least the following 24 fail-closed and negative control scenarios:
+   1. Genuine canonical `ord` positive resolution.
+   2. Spoofed Python function with `__module__="builtins"`, `__qualname__="ord"`.
+   3. Spoofed custom callable object.
+   4. Wrong object with Task 38.16 mechanism flag `is_builtin_ord_canonical=True`.
+   5. Post-startup monkeypatched `builtins.ord`.
+   6. Wrong built-in `builtins.chr`.
+   7. Wrong built-in `builtins.len`.
+   8. Wrong built-in `builtins.int`.
+   9. Wrong built-in `builtins.range`.
+   10. Wrong built-in `builtins.iter`.
+   11. Wrong built-in `builtins.next`.
+   12. Alias rebound (`_ord = ord; _ord = len; _ord(x)`).
+   13. Alias shadowing.
+   14. Alias resolving after `builtins.ord` monkeypatching.
+   15. Hostile `__index__` conversion hook.
+   16. Hostile `__int__` conversion hook.
+   17. Hostile `__trunc__` conversion hook.
+   18. Hostile `__str__` / `__repr__` callback.
+   19. Hostile `__bytes__` / `__buffer__` callback.
+   20. Hostile `__len__` / `__getitem__` / `__iter__` callback.
+   21. Hostile `str` subclass override.
+   22. Hostile `bytes` subclass override.
+   23. Hostile `bytearray` subclass override.
+   24. Invalid argument shapes / input forms.
+   *Required Hostile User-Controlled Callback Count:* Exactly **0**.
+
+10. **Governance Invariants and Gate Disposition Reaffirmation.**
+    - **Policy table strictly isolated:** `EXACT_IDENTITY_POLICY` remains strictly at **87** entries and version `2026-09-05.1`. No global key is added.
+    - **Gate outcome: HOLD, unchanged.** Each Layer-1 condition remains independently sufficient to keep this ADR at HOLD on both the current published baseline (`calls_unresolved=543`) and the prospective post-state (`calls_unresolved=533`): `nodes_unresolved=16`, `implicit_dispatch.unresolved_dispatches=7289`, `exit_code=1`. All Layer 1 conditions remain nonzero; **no claim is made or permitted that Task 38.16 clears the operational gate.** **H-1 and H-2 remain `Closed`; M-7 remains `Open, narrowed`; M-8 and M-9 remain `Open`** — all unchanged. **`ADR-032` remains INDETERMINATE / HOLD. Task 39 remains BLOCKED and must not begin.**
+
+**Non-goals — explicitly outside this proposed authorization.** No `EXACT_IDENTITY_POLICY` modification and no policy version bump (`2026-09-05.1`, 87 entries unchanged); no code or test changes in this governance phase; no production or trading code changes; no M-8 or M-9 remediation; no Task 39 work; and **no attempt to clear the gate**.
+
+
 ## Alternatives Considered
 - **No formal gate — treat the audit as informational only.** Rejected: an audit whose findings carry no consequence is easy to produce and easy to ignore; the entire point of running a structural audit before Task 39 is to make its outcome actionable.
 - **Gate on any open finding, regardless of severity.** Rejected: with 9 Low findings already on record (mostly `baseline: unknown` typing gaps and test-coverage notes), gating on every open item would block indefinitely on cosmetic issues unrelated to safety. The severity rubric exists precisely so the gate tracks what actually matters — a real reachable I/O/trading/inference/credential-leak path.
