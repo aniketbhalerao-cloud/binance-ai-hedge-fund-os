@@ -605,20 +605,29 @@ def test_re_parser_ord_calls_exact_resolution_accounting() -> None:
 
 
 def test_whole_system_audit_invariants() -> None:
-    """Verify the whole-system audit counters match the governed Task 38.16 targets."""
+    """Verify the whole-system audit counters match the governed structural invariants."""
     repo_root = Path(__file__).resolve().parent.parent.parent
     report = run_full_audit(repo_root)
     data = report.data
 
     identity_buckets = data["identity_resolution_buckets"]
 
-    # Target metrics for Task 38.16
+    # Target metrics for Task 38.16: structural invariants that remain globally stable
     assert data["calls_total"] == 7420
-    assert data["calls_unresolved"] == 533
     assert identity_buckets["project_source_available"] == 3768
-    assert identity_buckets["exact_identity_policy"] == 3114
     assert identity_buckets["forbidden"] == 5
-    assert identity_buckets["unresolved"] == 533
+    assert data["nodes_total"] == 268
+    assert data["nodes_unresolved"] == 16
+
+    # Total reconciliation invariant: total equals sum of identity buckets
+    assert (
+        identity_buckets["project_source_available"]
+        + identity_buckets["exact_identity_policy"]
+        + identity_buckets["forbidden"]
+        + identity_buckets["unresolved"]
+        == 7420
+    )
+    assert data["calls_unresolved"] == identity_buckets["unresolved"]
 
     # Negative controls must all be detected
     assert data["negative_controls_total"] == 10

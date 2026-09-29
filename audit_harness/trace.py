@@ -230,7 +230,10 @@ def _is_safe_metaclass(meta: type) -> bool:
             return False
         if "__getattr__" in d:
             return False
-        if "__getattribute__" in d and d["__getattribute__"] is not type.__getattribute__:
+        if (
+            "__getattribute__" in d
+            and d["__getattribute__"] is not type.__getattribute__
+        ):
             return False
         if "__call__" in d and d["__call__"] is not type.__call__:
             return False
@@ -356,6 +359,7 @@ def _overrides_base_dunder(cls: type, dunder_name: str, base: type) -> bool:
     found = _static_get(cls, dunder_name)
     default = _static_get(base, dunder_name)
     return found is not _MISSING and found is not default
+
 
 #: A local variable assigned the return value of one of these stdlib
 #: functions has a fixed, documented return type -- a structural fact
@@ -644,9 +648,7 @@ class StaticWalker:
         self.provider_class = provider_class
         self.provider_owner_module = provider_owner_module
         self.registration_providers = registration_providers
-        self.registration_provider_semantic_count = (
-            registration_provider_semantic_count
-        )
+        self.registration_provider_semantic_count = registration_provider_semantic_count
         #: (owner_class, attribute_name) -> the real type of that instance
         #: attribute, for the small number of ``self.<attr>.<method>()``
         #: chains this codebase's own container/registry machinery uses
@@ -772,9 +774,7 @@ class StaticWalker:
                 ret = args[0]
         return ret if isinstance(ret, type) else None
 
-    def _eval_annotation_head(
-        self, ann: ast.expr, g: dict[str, object]
-    ) -> type | None:
+    def _eval_annotation_head(self, ann: ast.expr, g: dict[str, object]) -> type | None:
         """The outermost class an annotation AST node names --
         ``dict[str, X]`` -> ``dict``, ``list[X]`` -> ``list``, ``str`` ->
         ``str``, ``X | None`` -> ``X``. Reads the annotation's own AST
@@ -795,9 +795,7 @@ class StaticWalker:
             return candidates[0] if len(candidates) == 1 else None
         return None
 
-    def _eval_dict_value_head(
-        self, ann: ast.expr, g: dict[str, object]
-    ) -> type | None:
+    def _eval_dict_value_head(self, ann: ast.expr, g: dict[str, object]) -> type | None:
         """For a ``dict[K, V]`` annotation, ``V``'s own outermost class
         -- ``dict[str, list[str]]`` -> ``list``. What
         ``container_expr[key].method(...)`` needs to resolve ``.method``
@@ -1274,9 +1272,7 @@ class StaticWalker:
                         and owner_class is not None
                         and hasattr(owner_class, fn.attr)
                     ):
-                        return getattr(
-                            owner_class, fn.attr
-                        ), "self-dot-class-attribute"
+                        return getattr(owner_class, fn.attr), "self-dot-class-attribute"
 
                     if (
                         base.value.id == "self"
@@ -1335,9 +1331,7 @@ class StaticWalker:
                 if isinstance(base, ast.Attribute):
                     base_obj = self._resolve_object_chain(base, g, loc)
                     if base_obj is not None and hasattr(base_obj, fn.attr):
-                        return getattr(
-                            base_obj, fn.attr
-                        ), "module-attribute-chain"
+                        return getattr(base_obj, fn.attr), "module-attribute-chain"
 
                 # A chained call's own return value
                 # (`value.strip().lower()`'s outer `.lower()`) -- resolve
@@ -1581,9 +1575,8 @@ class StaticWalker:
 
         # Callee must be exact live inspect.signature
         callee = None
-        if (
-            isinstance(assign_call.func, ast.Attribute)
-            and isinstance(assign_call.func.value, ast.Name)
+        if isinstance(assign_call.func, ast.Attribute) and isinstance(
+            assign_call.func.value, ast.Name
         ):
             mod_obj = loc.get(assign_call.func.value.id, _MISSING)
             if mod_obj is _MISSING:
@@ -1623,7 +1616,8 @@ class StaticWalker:
         if type(sig) is not inspect.Signature:
             return False
 
-        # Obligation D: parameters mapping backed by MappingProxyType with authorized view
+        # Obligation D: parameters mapping backed by MappingProxyType with
+        # authorized view
         params = sig.parameters
         if type(params) is not types.MappingProxyType:
             return False
@@ -1653,17 +1647,25 @@ class StaticWalker:
 
         Authorized syntactic forms:
         1. `cls.model_config.get(...)` where cls is a BaseSettings subclass
-        2. `settings_cls.model_config.get(...)` where settings_cls is a BaseSettings subclass
-        3. `self.config.get(...)` where self is a PydanticBaseSettingsSource subclass
+        2. `settings_cls.model_config.get(...)` where settings_cls is a
+           BaseSettings subclass
+        3. `self.config.get(...)` where self is a PydanticBaseSettingsSource
+           subclass
 
         Obligations:
-        A. Direct AST call matching one of the 3 authorized forms with write-once / non-reassignment provenance.
-        B. Receiver proven to be BaseSettings / PydanticBaseSettingsSource subclass via type/specialization binding.
-        C. Non-execution safety: no custom __signature__, no hostile metaclass or dunder hooks.
-        D. Container invariance: runtime type of model_config/config is strictly `dict` (no custom mapping/descriptor).
+        A. Direct AST call matching one of the 3 authorized forms with
+           write-once / non-reassignment provenance.
+        B. Receiver proven to be BaseSettings / PydanticBaseSettingsSource
+           subclass via type/specialization binding.
+        C. Non-execution safety: no custom __signature__, no hostile metaclass
+           or dunder hooks.
+        D. Container invariance: runtime type of model_config/config is strictly
+           `dict` (no custom mapping/descriptor).
         E. Exact live `dict.get` callable identity defense-in-depth.
-        F. Direct attribute call shape with 1 or 2 positional arguments and 0 keywords.
-        G. Fail closed on any missing subject, ambiguous binding, or unproven condition.
+        F. Direct attribute call shape with 1 or 2 positional arguments and
+           0 keywords.
+        G. Fail closed on any missing subject, ambiguous binding, or unproven
+           condition.
         """
         if isinstance(target, dict) and local_var_types is None:
             local_var_types = param_hints if param_hints is not None else {}
@@ -1921,7 +1923,9 @@ class StaticWalker:
             receiver_cls = None
             if owner_class is not None and isinstance(owner_class, type):
                 receiver_cls = owner_class
-            elif "self" in local_var_types and isinstance(local_var_types["self"], type):
+            elif "self" in local_var_types and isinstance(
+                local_var_types["self"], type
+            ):
                 receiver_cls = local_var_types["self"]
             elif "self" in param_hints and isinstance(param_hints["self"], type):
                 receiver_cls = param_hints["self"]
@@ -1956,6 +1960,7 @@ class StaticWalker:
         is_inspect_signature_parameters_mappingproxy_items: bool = False,
         is_pydantic_settings_model_config_get: bool = False,
         is_builtin_ord_canonical: bool = False,
+        is_builtin_valueerror_canonical: bool = False,
     ) -> IdentityVerdict | None:
         callee_text = ast.unparse(node.func)
         if mechanism == "local-helper-inline":
@@ -1990,6 +1995,7 @@ class StaticWalker:
             is_inspect_signature_parameters_mappingproxy_items=is_inspect_signature_parameters_mappingproxy_items,
             is_pydantic_settings_model_config_get=is_pydantic_settings_model_config_get,
             is_builtin_ord_canonical=is_builtin_ord_canonical,
+            is_builtin_valueerror_canonical=is_builtin_valueerror_canonical,
         )
         self.call_records.append(
             CallRecord(site_label, callee_text, mechanism, verdict)
@@ -2052,9 +2058,7 @@ class StaticWalker:
             target_verdicts.append(
                 classify_callable(real_provider, module=module, qualname=qualname)
             )
-            self._walk_provider_root(
-                provider_id, provider, always_follow_modules
-            )
+            self._walk_provider_root(provider_id, provider, always_follow_modules)
 
         enumeration_ran = providers is not None and semantic_targets is not None
         all_targets_resolved = (
@@ -3072,10 +3076,7 @@ class StaticWalker:
                     )
                 continue
 
-            if (
-                isinstance(node.func, ast.Attribute)
-                and node.func.attr == "provider"
-            ):
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "provider":
                 from core.interfaces import Registration
 
                 receiver_type = self._infer_type(
@@ -3118,10 +3119,7 @@ class StaticWalker:
                 )
 
             is_pydantic_model_config_get = False
-            if (
-                isinstance(node.func, ast.Attribute)
-                and node.func.attr == "get"
-            ):
+            if isinstance(node.func, ast.Attribute) and node.func.attr == "get":
                 if self._prove_pydantic_settings_model_config_get(
                     node,
                     tree,
@@ -3144,6 +3142,12 @@ class StaticWalker:
                 if unwrapped is _CANONICAL_BUILTINS_ORD:
                     is_ord_canonical = True
 
+            is_valueerror_canonical = (
+                isinstance(node.func, ast.Name)
+                and node.func.id == "ValueError"
+                and mechanism == "builtins-lookup"
+            )
+
             call_verdict = self._record_call(
                 site_label,
                 node,
@@ -3152,6 +3156,7 @@ class StaticWalker:
                 is_inspect_signature_parameters_mappingproxy_items=is_insp_sig_mappingproxy,
                 is_pydantic_settings_model_config_get=is_pydantic_model_config_get,
                 is_builtin_ord_canonical=is_ord_canonical,
+                is_builtin_valueerror_canonical=is_valueerror_canonical,
             )
 
             if inspect.isfunction(target) or inspect.ismethod(target):
@@ -3230,9 +3235,7 @@ class StaticWalker:
                 # NamedTuple only ever synthesizes __new__ (never
                 # __init__), so this is only ever checked -- and only
                 # ever passed to classify_ctor -- for the __new__ side.
-                is_nt_new = custom_new and is_namedtuple_generated_new(
-                    cls, cls.__new__
-                )
+                is_nt_new = custom_new and is_namedtuple_generated_new(cls, cls.__new__)
 
                 def classify_ctor(
                     method: object,

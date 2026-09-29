@@ -827,6 +827,125 @@ def _capture_canonical_builtins_ord() -> object:
 _CANONICAL_BUILTINS_ORD: object = _capture_canonical_builtins_ord()
 
 
+# Task 38.17 Literal-Derived Primitive Root of Trust (B2G Final Contract)
+_tuple_type = ().__class__
+_type_type = _tuple_type.__class__
+_object_root = _tuple_type.__mro__[-1]
+_dict_type = {}.__class__
+_module_type = types.ModuleType
+
+_class_descr = _object_root.__dict__["__class__"].__get__
+_object_getattribute = _object_root.__dict__["__getattribute__"]
+_dict_get = _dict_type.__dict__["get"]
+
+_type_flags = _type_type.__dict__["__flags__"]
+_type_base = _type_type.__dict__["__base__"]
+_type_mro = _type_type.__dict__["__mro__"]
+_type_name = _type_type.__dict__["__name__"]
+_type_qualname = _type_type.__dict__["__qualname__"]
+_type_module = _type_type.__dict__["__module__"]
+
+Py_TPFLAGS_HEAPTYPE = 1 << 9
+Py_TPFLAGS_IMMUTABLETYPE = 1 << 8
+
+
+def _capture_canonical_builtins_valueerror(
+    builtins_mod: object = builtins,
+) -> object | None:
+    """Capture and structurally authenticate builtins.ValueError at startup.
+
+    Enforces the Task 38.17 literal-derived primitive root-of-trust contract:
+    - Derives primitives exclusively from literals ((), {}, type, object).
+    - Validates module instance type before extracting raw dictionary via
+      literal-derived _object_getattribute, completely avoiding bare exception
+      handling.
+    - Authenticates BaseException anchor -> Exception anchor -> ValueError.
+    - Validates CPython 3.12.13 type flags (HEAPTYPE==0, IMMUTABLETYPE!=0).
+    - Validates module, name, qualname, base, and exact MRO tuple structure.
+    - Returns None on any authentication failure (fail-closed sentinel).
+    """
+    if builtins_mod is None:
+        return None
+    mod_cls = _class_descr(builtins_mod)
+    if mod_cls is not _module_type and not (
+        _class_descr(mod_cls) is _type_type
+        and _module_type in _type_mro.__get__(mod_cls)
+    ):
+        return None
+
+    raw_dict = _object_getattribute(builtins_mod, "__dict__")
+    if _class_descr(raw_dict) is not _dict_type:
+        return None
+
+    # Authenticate BaseException anchor
+    be = _dict_get(raw_dict, "BaseException")
+    if be is None or _class_descr(be) is not _type_type:
+        return None
+    be_flags = _type_flags.__get__(be)
+    if (be_flags & Py_TPFLAGS_HEAPTYPE) != 0 or (
+        be_flags & Py_TPFLAGS_IMMUTABLETYPE
+    ) == 0:
+        return None
+    if _type_module.__get__(be) != "builtins":
+        return None
+    if (
+        _type_name.__get__(be) != "BaseException"
+        or _type_qualname.__get__(be) != "BaseException"
+    ):
+        return None
+    if _type_base.__get__(be) is not _object_root:
+        return None
+    if _type_mro.__get__(be) != (be, _object_root):
+        return None
+
+    # Authenticate Exception anchor
+    exc = _dict_get(raw_dict, "Exception")
+    if exc is None or _class_descr(exc) is not _type_type:
+        return None
+    exc_flags = _type_flags.__get__(exc)
+    if (exc_flags & Py_TPFLAGS_HEAPTYPE) != 0 or (
+        exc_flags & Py_TPFLAGS_IMMUTABLETYPE
+    ) == 0:
+        return None
+    if _type_module.__get__(exc) != "builtins":
+        return None
+    if (
+        _type_name.__get__(exc) != "Exception"
+        or _type_qualname.__get__(exc) != "Exception"
+    ):
+        return None
+    if _type_base.__get__(exc) is not be:
+        return None
+    if _type_mro.__get__(exc) != (exc, be, _object_root):
+        return None
+
+    # Authenticate ValueError
+    ve = _dict_get(raw_dict, "ValueError")
+    if ve is None or _class_descr(ve) is not _type_type:
+        return None
+    ve_flags = _type_flags.__get__(ve)
+    if (ve_flags & Py_TPFLAGS_HEAPTYPE) != 0 or (
+        ve_flags & Py_TPFLAGS_IMMUTABLETYPE
+    ) == 0:
+        return None
+    if _type_module.__get__(ve) != "builtins":
+        return None
+    if (
+        _type_name.__get__(ve) != "ValueError"
+        or _type_qualname.__get__(ve) != "ValueError"
+    ):
+        return None
+    if _type_base.__get__(ve) is not exc:
+        return None
+    if _type_mro.__get__(ve) != (ve, exc, be, _object_root):
+        return None
+
+    return ve
+
+
+_CANONICAL_BUILTINS_VALUEERROR: object | None = _capture_canonical_builtins_valueerror()
+
+
 def classify_callable(
     obj: object,
     *,
@@ -837,6 +956,7 @@ def classify_callable(
     is_inspect_signature_parameters_mappingproxy_items: bool = False,
     is_pydantic_settings_model_config_get: bool = False,
     is_builtin_ord_canonical: bool = False,
+    is_builtin_valueerror_canonical: bool = False,
 ) -> IdentityVerdict:
     """Classify one resolved live callable per Harness Requirement 4.
 
@@ -863,6 +983,10 @@ def classify_callable(
     ``builtins.ord`` calls proven to originate from direct built-in lookup or
     write-once local alias: authorization requires both this provenance flag
     and exact object identity against ``_CANONICAL_BUILTINS_ORD``.
+    ``is_builtin_valueerror_canonical`` is the Task 38.17 discipline for
+    ``builtins.ValueError`` calls proven to originate from direct built-in lookup:
+    authorization requires both this provenance flag and exact object identity
+    against ``_CANONICAL_BUILTINS_VALUEERROR``.
     """
     key = _identity_key(module, qualname)
 
@@ -891,6 +1015,21 @@ def classify_callable(
                 qualname or "ord",
                 "exact_identity_policy",
                 "builtins.ord-canonical-sentinel",
+                False,
+            )
+        return IdentityVerdict(module, qualname, "unresolved", None, False)
+
+    if is_builtin_valueerror_canonical:
+        unwrapped = obj.__func__ if type(obj) is types.MethodType else obj
+        if (
+            _CANONICAL_BUILTINS_VALUEERROR is not None
+            and unwrapped is _CANONICAL_BUILTINS_VALUEERROR
+        ):
+            return IdentityVerdict(
+                module or "builtins",
+                qualname or "ValueError",
+                "exact_identity_policy",
+                "builtins.ValueError-canonical-sentinel",
                 False,
             )
         return IdentityVerdict(module, qualname, "unresolved", None, False)
