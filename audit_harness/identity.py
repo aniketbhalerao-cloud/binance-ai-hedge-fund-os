@@ -946,6 +946,105 @@ def _capture_canonical_builtins_valueerror(
 _CANONICAL_BUILTINS_VALUEERROR: object | None = _capture_canonical_builtins_valueerror()
 
 
+def _capture_canonical_builtins_assertionerror(
+    builtins_mod: object = builtins,
+) -> object | None:
+    """Capture and structurally authenticate builtins.AssertionError at startup.
+
+    Enforces the Task 38.19 literal-derived primitive root-of-trust contract:
+    - Reuses the Task 38.17 literal-derived primitives ((), {}, type, object).
+    - Validates module instance type before extracting raw dictionary via
+      literal-derived _object_getattribute, completely avoiding bare exception
+      handling.
+    - Authenticates BaseException anchor -> Exception anchor -> AssertionError.
+    - Validates CPython 3.12.13 type flags (HEAPTYPE==0, IMMUTABLETYPE!=0).
+    - Validates module, name, qualname, base, and exact MRO tuple structure.
+    - Returns None on any authentication failure (fail-closed sentinel).
+    """
+    if builtins_mod is None:
+        return None
+    mod_cls = _class_descr(builtins_mod)
+    if mod_cls is not _module_type and not (
+        _class_descr(mod_cls) is _type_type
+        and _module_type in _type_mro.__get__(mod_cls)
+    ):
+        return None
+
+    raw_dict = _object_getattribute(builtins_mod, "__dict__")
+    if _class_descr(raw_dict) is not _dict_type:
+        return None
+
+    # Authenticate BaseException anchor
+    be = _dict_get(raw_dict, "BaseException")
+    if be is None or _class_descr(be) is not _type_type:
+        return None
+    be_flags = _type_flags.__get__(be)
+    if (be_flags & Py_TPFLAGS_HEAPTYPE) != 0 or (
+        be_flags & Py_TPFLAGS_IMMUTABLETYPE
+    ) == 0:
+        return None
+    if _type_module.__get__(be) != "builtins":
+        return None
+    if (
+        _type_name.__get__(be) != "BaseException"
+        or _type_qualname.__get__(be) != "BaseException"
+    ):
+        return None
+    if _type_base.__get__(be) is not _object_root:
+        return None
+    if _type_mro.__get__(be) != (be, _object_root):
+        return None
+
+    # Authenticate Exception anchor
+    exc = _dict_get(raw_dict, "Exception")
+    if exc is None or _class_descr(exc) is not _type_type:
+        return None
+    exc_flags = _type_flags.__get__(exc)
+    if (exc_flags & Py_TPFLAGS_HEAPTYPE) != 0 or (
+        exc_flags & Py_TPFLAGS_IMMUTABLETYPE
+    ) == 0:
+        return None
+    if _type_module.__get__(exc) != "builtins":
+        return None
+    if (
+        _type_name.__get__(exc) != "Exception"
+        or _type_qualname.__get__(exc) != "Exception"
+    ):
+        return None
+    if _type_base.__get__(exc) is not be:
+        return None
+    if _type_mro.__get__(exc) != (exc, be, _object_root):
+        return None
+
+    # Authenticate AssertionError
+    ae = _dict_get(raw_dict, "AssertionError")
+    if ae is None or _class_descr(ae) is not _type_type:
+        return None
+    ae_flags = _type_flags.__get__(ae)
+    if (ae_flags & Py_TPFLAGS_HEAPTYPE) != 0 or (
+        ae_flags & Py_TPFLAGS_IMMUTABLETYPE
+    ) == 0:
+        return None
+    if _type_module.__get__(ae) != "builtins":
+        return None
+    if (
+        _type_name.__get__(ae) != "AssertionError"
+        or _type_qualname.__get__(ae) != "AssertionError"
+    ):
+        return None
+    if _type_base.__get__(ae) is not exc:
+        return None
+    if _type_mro.__get__(ae) != (ae, exc, be, _object_root):
+        return None
+
+    return ae
+
+
+_CANONICAL_BUILTINS_ASSERTIONERROR: object | None = (
+    _capture_canonical_builtins_assertionerror()
+)
+
+
 def classify_callable(
     obj: object,
     *,
@@ -957,6 +1056,7 @@ def classify_callable(
     is_pydantic_settings_model_config_get: bool = False,
     is_builtin_ord_canonical: bool = False,
     is_builtin_valueerror_canonical: bool = False,
+    is_builtin_assertionerror_canonical: bool = False,
 ) -> IdentityVerdict:
     """Classify one resolved live callable per Harness Requirement 4.
 
@@ -987,6 +1087,10 @@ def classify_callable(
     ``builtins.ValueError`` calls proven to originate from direct built-in lookup:
     authorization requires both this provenance flag and exact object identity
     against ``_CANONICAL_BUILTINS_VALUEERROR``.
+    ``is_builtin_assertionerror_canonical`` is the Task 38.19 discipline for
+    ``builtins.AssertionError`` calls proven to originate from direct built-in
+    lookup: authorization requires both this provenance flag and exact object
+    identity against ``_CANONICAL_BUILTINS_ASSERTIONERROR``.
     """
     key = _identity_key(module, qualname)
 
@@ -1030,6 +1134,21 @@ def classify_callable(
                 qualname or "ValueError",
                 "exact_identity_policy",
                 "builtins.ValueError-canonical-sentinel",
+                False,
+            )
+        return IdentityVerdict(module, qualname, "unresolved", None, False)
+
+    if is_builtin_assertionerror_canonical:
+        unwrapped = obj.__func__ if type(obj) is types.MethodType else obj
+        if (
+            _CANONICAL_BUILTINS_ASSERTIONERROR is not None
+            and unwrapped is _CANONICAL_BUILTINS_ASSERTIONERROR
+        ):
+            return IdentityVerdict(
+                module or "builtins",
+                qualname or "AssertionError",
+                "exact_identity_policy",
+                "builtins.AssertionError-canonical-sentinel",
                 False,
             )
         return IdentityVerdict(module, qualname, "unresolved", None, False)
