@@ -1962,6 +1962,7 @@ class StaticWalker:
         is_builtin_ord_canonical: bool = False,
         is_builtin_valueerror_canonical: bool = False,
         is_builtin_assertionerror_canonical: bool = False,
+        is_builtin_overflowerror_canonical: bool = False,
     ) -> IdentityVerdict | None:
         callee_text = ast.unparse(node.func)
         if mechanism == "local-helper-inline":
@@ -1998,6 +1999,7 @@ class StaticWalker:
             is_builtin_ord_canonical=is_builtin_ord_canonical,
             is_builtin_valueerror_canonical=is_builtin_valueerror_canonical,
             is_builtin_assertionerror_canonical=is_builtin_assertionerror_canonical,
+            is_builtin_overflowerror_canonical=is_builtin_overflowerror_canonical,
         )
         self.call_records.append(
             CallRecord(site_label, callee_text, mechanism, verdict)
@@ -3156,6 +3158,12 @@ class StaticWalker:
                 and mechanism == "builtins-lookup"
             )
 
+            is_overflowerror_canonical = (
+                isinstance(node.func, ast.Name)
+                and node.func.id == "OverflowError"
+                and mechanism == "builtins-lookup"
+            )
+
             call_verdict = self._record_call(
                 site_label,
                 node,
@@ -3166,6 +3174,7 @@ class StaticWalker:
                 is_builtin_ord_canonical=is_ord_canonical,
                 is_builtin_valueerror_canonical=is_valueerror_canonical,
                 is_builtin_assertionerror_canonical=is_assertionerror_canonical,
+                is_builtin_overflowerror_canonical=is_overflowerror_canonical,
             )
 
             if inspect.isfunction(target) or inspect.ismethod(target):

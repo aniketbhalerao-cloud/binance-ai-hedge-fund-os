@@ -640,7 +640,12 @@ def test_sibling_families_do_not_move() -> None:
 
 
 def test_whole_system_audit_invariants() -> None:
-    """Verify Task 38.19 whole-system counters: 3768 + 3128 + 5 + 519 = 7420."""
+    """Verify Task 38.19 whole-system structural invariants.
+
+    Successor-compatible: Task 38.20 owns the exact_identity_policy /
+    unresolved snapshots. This test keeps AssertionError-local and
+    stable global invariants, not frozen 3128 / 519 bucket counts.
+    """
     repo_root = Path(__file__).resolve().parent.parent.parent
     report = run_full_audit(repo_root)
     data = report.data
@@ -648,11 +653,8 @@ def test_whole_system_audit_invariants() -> None:
     identity_buckets = data["identity_resolution_buckets"]
 
     assert data["calls_total"] == 7420
-    assert data["calls_unresolved"] == 519
     assert identity_buckets["project_source_available"] == 3768
-    assert identity_buckets["exact_identity_policy"] == 3128
     assert identity_buckets["forbidden"] == 5
-    assert identity_buckets["unresolved"] == 519
     assert data["nodes_total"] == 268
     assert data["nodes_unresolved"] == 16
 

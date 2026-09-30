@@ -1045,6 +1045,126 @@ _CANONICAL_BUILTINS_ASSERTIONERROR: object | None = (
 )
 
 
+def _capture_canonical_builtins_overflowerror(
+    builtins_mod: object = builtins,
+) -> object | None:
+    """Capture and structurally authenticate builtins.OverflowError at startup.
+
+    Enforces the Task 38.20 literal-derived primitive root-of-trust contract:
+    - Reuses the Task 38.17 literal-derived primitives ((), {}, type, object).
+    - Validates module instance type before extracting raw dictionary via
+      literal-derived _object_getattribute, completely avoiding bare exception
+      handling.
+    - Authenticates BaseException -> Exception -> ArithmeticError -> OverflowError.
+    - Validates CPython 3.12.13 type flags (HEAPTYPE==0, IMMUTABLETYPE!=0).
+    - Validates module, name, qualname, base, and exact MRO tuple structure.
+    - Returns None on any authentication failure (fail-closed sentinel).
+    """
+    if builtins_mod is None:
+        return None
+    mod_cls = _class_descr(builtins_mod)
+    if mod_cls is not _module_type and not (
+        _class_descr(mod_cls) is _type_type
+        and _module_type in _type_mro.__get__(mod_cls)
+    ):
+        return None
+
+    raw_dict = _object_getattribute(builtins_mod, "__dict__")
+    if _class_descr(raw_dict) is not _dict_type:
+        return None
+
+    # Authenticate BaseException anchor
+    be = _dict_get(raw_dict, "BaseException")
+    if be is None or _class_descr(be) is not _type_type:
+        return None
+    be_flags = _type_flags.__get__(be)
+    if (be_flags & Py_TPFLAGS_HEAPTYPE) != 0 or (
+        be_flags & Py_TPFLAGS_IMMUTABLETYPE
+    ) == 0:
+        return None
+    if _type_module.__get__(be) != "builtins":
+        return None
+    if (
+        _type_name.__get__(be) != "BaseException"
+        or _type_qualname.__get__(be) != "BaseException"
+    ):
+        return None
+    if _type_base.__get__(be) is not _object_root:
+        return None
+    if _type_mro.__get__(be) != (be, _object_root):
+        return None
+
+    # Authenticate Exception anchor
+    exc = _dict_get(raw_dict, "Exception")
+    if exc is None or _class_descr(exc) is not _type_type:
+        return None
+    exc_flags = _type_flags.__get__(exc)
+    if (exc_flags & Py_TPFLAGS_HEAPTYPE) != 0 or (
+        exc_flags & Py_TPFLAGS_IMMUTABLETYPE
+    ) == 0:
+        return None
+    if _type_module.__get__(exc) != "builtins":
+        return None
+    if (
+        _type_name.__get__(exc) != "Exception"
+        or _type_qualname.__get__(exc) != "Exception"
+    ):
+        return None
+    if _type_base.__get__(exc) is not be:
+        return None
+    if _type_mro.__get__(exc) != (exc, be, _object_root):
+        return None
+
+    # Authenticate ArithmeticError anchor
+    ar = _dict_get(raw_dict, "ArithmeticError")
+    if ar is None or _class_descr(ar) is not _type_type:
+        return None
+    ar_flags = _type_flags.__get__(ar)
+    if (ar_flags & Py_TPFLAGS_HEAPTYPE) != 0 or (
+        ar_flags & Py_TPFLAGS_IMMUTABLETYPE
+    ) == 0:
+        return None
+    if _type_module.__get__(ar) != "builtins":
+        return None
+    if (
+        _type_name.__get__(ar) != "ArithmeticError"
+        or _type_qualname.__get__(ar) != "ArithmeticError"
+    ):
+        return None
+    if _type_base.__get__(ar) is not exc:
+        return None
+    if _type_mro.__get__(ar) != (ar, exc, be, _object_root):
+        return None
+
+    # Authenticate OverflowError
+    oe = _dict_get(raw_dict, "OverflowError")
+    if oe is None or _class_descr(oe) is not _type_type:
+        return None
+    oe_flags = _type_flags.__get__(oe)
+    if (oe_flags & Py_TPFLAGS_HEAPTYPE) != 0 or (
+        oe_flags & Py_TPFLAGS_IMMUTABLETYPE
+    ) == 0:
+        return None
+    if _type_module.__get__(oe) != "builtins":
+        return None
+    if (
+        _type_name.__get__(oe) != "OverflowError"
+        or _type_qualname.__get__(oe) != "OverflowError"
+    ):
+        return None
+    if _type_base.__get__(oe) is not ar:
+        return None
+    if _type_mro.__get__(oe) != (oe, ar, exc, be, _object_root):
+        return None
+
+    return oe
+
+
+_CANONICAL_BUILTINS_OVERFLOWERROR: object | None = (
+    _capture_canonical_builtins_overflowerror()
+)
+
+
 def classify_callable(
     obj: object,
     *,
@@ -1057,6 +1177,7 @@ def classify_callable(
     is_builtin_ord_canonical: bool = False,
     is_builtin_valueerror_canonical: bool = False,
     is_builtin_assertionerror_canonical: bool = False,
+    is_builtin_overflowerror_canonical: bool = False,
 ) -> IdentityVerdict:
     """Classify one resolved live callable per Harness Requirement 4.
 
@@ -1091,6 +1212,10 @@ def classify_callable(
     ``builtins.AssertionError`` calls proven to originate from direct built-in
     lookup: authorization requires both this provenance flag and exact object
     identity against ``_CANONICAL_BUILTINS_ASSERTIONERROR``.
+    ``is_builtin_overflowerror_canonical`` is the Task 38.20 discipline for
+    ``builtins.OverflowError`` calls proven to originate from direct built-in
+    lookup: authorization requires both this provenance flag and exact object
+    identity against ``_CANONICAL_BUILTINS_OVERFLOWERROR``.
     """
     key = _identity_key(module, qualname)
 
@@ -1149,6 +1274,21 @@ def classify_callable(
                 qualname or "AssertionError",
                 "exact_identity_policy",
                 "builtins.AssertionError-canonical-sentinel",
+                False,
+            )
+        return IdentityVerdict(module, qualname, "unresolved", None, False)
+
+    if is_builtin_overflowerror_canonical:
+        unwrapped = obj.__func__ if type(obj) is types.MethodType else obj
+        if (
+            _CANONICAL_BUILTINS_OVERFLOWERROR is not None
+            and unwrapped is _CANONICAL_BUILTINS_OVERFLOWERROR
+        ):
+            return IdentityVerdict(
+                module or "builtins",
+                qualname or "OverflowError",
+                "exact_identity_policy",
+                "builtins.OverflowError-canonical-sentinel",
                 False,
             )
         return IdentityVerdict(module, qualname, "unresolved", None, False)
